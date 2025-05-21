@@ -6,14 +6,17 @@ enum ShipmentStatus {
   readyForBooking,
   awaitingVendorConfirmation,
   confirmedByVendor,
-  allTiersRejected,
+  allGradesRejected, // Renamed from allTiersRejected
   bookingFinalized,
   canceledByDispatcher,
 }
 
+// New: Enum for Vendor Grade
+enum VendorGrade { A, B, C, D, unassigned }
+
 enum UserRole { dispatcher, vendor }
 
-// --- Data Model (Shipment class remains the same) ---
+// --- Data Models ---
 class Shipment {
   final String shipmentNo;
   String? shipmentType;
@@ -22,13 +25,18 @@ class Shipment {
   final String route;
   final DateTime plannedCheckIn;
   String? shippingConType;
-  String? vendorName;
+
+  String? vendorName; // Name of the vendor who confirmed
+  String? assignedVendorId; // Actual ID of the vendor from your mvendor table
+  VendorGrade? confirmedByGrade; // Grade of the vendor who confirmed
+
   String? vehicleRegNo;
   ShipmentStatus status;
   String? rejectionReason;
   String? cancellationReason;
-  int currentVendorTier;
-  final int maxVendorTiers;
+
+  VendorGrade currentGradeToAssign; // The current grade the shipment is offered to
+  final List<VendorGrade> gradeAssignmentOrder; // Defines the order of grades to try
 
   Shipment({
     required this.shipmentNo,
@@ -39,16 +47,43 @@ class Shipment {
     required this.plannedCheckIn,
     this.shippingConType,
     this.vendorName,
+    this.assignedVendorId,
+    this.confirmedByGrade,
     this.vehicleRegNo,
     this.status = ShipmentStatus.readyForBooking,
     this.rejectionReason,
     this.cancellationReason,
-    this.currentVendorTier = 1,
-    this.maxVendorTiers = 3,
+    this.currentGradeToAssign = VendorGrade.A, // Default to Grade A
+    this.gradeAssignmentOrder = const [VendorGrade.A, VendorGrade.B, VendorGrade.C, VendorGrade.D],
   });
 
   String get plannedDateFormatted =>
       DateFormat('yyyy-MM-dd HH:mm').format(plannedCheckIn.toLocal());
+
+  VendorGrade? getNextGradeToAssignInOrder() {
+    int currentIndex = gradeAssignmentOrder.indexOf(currentGradeToAssign);
+    if (currentIndex != -1 && currentIndex < gradeAssignmentOrder.length - 1) {
+      return gradeAssignmentOrder[currentIndex + 1];
+    }
+    return null; // No next grade in the defined order
+  }
+}
+
+// Simulated Vendor User Model (in a real app, this would come from your backend)
+class VendorUser {
+  final String firebaseUid;
+  final String vendorId; // From your mvendor table
+  final String name;
+  final VendorGrade grade;
+  final String email;
+
+  VendorUser({
+    required this.firebaseUid,
+    required this.vendorId,
+    required this.name,
+    required this.grade,
+    required this.email,
+  });
 }
 
 
@@ -65,17 +100,16 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'ระบบจองรถ',
       theme: ThemeData(
-        colorSchemeSeed: Colors.lightBlueAccent,
+        colorSchemeSeed: Colors.deepPurpleAccent,
         visualDensity: VisualDensity.adaptivePlatformDensity,
         useMaterial3: true,
       ),
-      home: const ShipmentPage(), // Ensure ShipmentPage class is defined
+      home: const ShipmentPage(),
     );
   }
 }
 
 // --- Shipment Page State Management ---
-// Ensure this class is defined correctly
 class ShipmentPage extends StatefulWidget {
   const ShipmentPage({super.key});
 
@@ -86,34 +120,31 @@ class ShipmentPage extends StatefulWidget {
 
 class _ShipmentPageState extends State<ShipmentPage> {
   UserRole _currentUserRole = UserRole.dispatcher;
+  VendorUser? _currentVendorUser; // To store details of the logged-in/simulated vendor
+
   final List<String> _availableVehicleTypes = [
     'รถกระบะ', 'รถกระบะตู้ทึบ', 'รถบรรทุก 4 ล้อ', 'รถบรรทุก 6 ล้อ',
     'รถบรรทุก 10 ล้อ', 'รถพ่วง', 'รถตู้เย็น', 'Other',
   ];
-  // FIX: prefer_final_fields
+
   final List<Shipment> _allShipments = [
-    Shipment(shipmentNo: 'SHP001', route: 'Route A - North', plannedCheckIn: DateTime.now().add(const Duration(days: 5, hours: 10)), shipmentType: 'FTL', doNo: 'DO-1001', shippingConType: '20'),
-    Shipment(shipmentNo: 'SHP002', route: 'Route B - East', plannedCheckIn: DateTime.now().add(const Duration(days: 6, hours: 14)), shipmentType: 'LTL', shippingType: 'รถกระบะตู้ทึบ', doNo: 'DO-1002', shippingConType: '20'),
-    Shipment(shipmentNo: 'SHP003', route: 'Route C - West', plannedCheckIn: DateTime.now().add(const Duration(days: 7, hours: 9)), shipmentType: 'FTL', shippingType: 'รถบรรทุก 10 ล้อ', doNo: 'DO-1003', shippingConType: '20', status: ShipmentStatus.awaitingVendorConfirmation, currentVendorTier: 1),
-    Shipment(shipmentNo: 'SHP004', route: 'Route D - South', plannedCheckIn: DateTime.now().add(const Duration(days: 8, hours: 16)), shipmentType: 'FTL', shippingType: 'รถพ่วง', doNo: 'DO-1004', shippingConType: '20', status: ShipmentStatus.confirmedByVendor, vendorName: 'GoodTransporter (Tier 1)', vehicleRegNo: 'กท-1234'),
-    Shipment(shipmentNo: 'SHP005', route: 'Route E - Central', plannedCheckIn: DateTime.now().add(const Duration(days: 2, hours: 11)), shipmentType: 'FTL', doNo: 'DO-1005', shippingConType: '20', status: ShipmentStatus.readyForBooking, maxVendorTiers: 2),
-    Shipment(shipmentNo: 'SHP006', route: 'Route F - NorthEast', plannedCheckIn: DateTime.now().add(const Duration(days: 3, hours: 15)), shipmentType: 'FTL', shippingType: 'รถบรรทุก 6 ล้อ', doNo: 'DO-1006', shippingConType: '20', status: ShipmentStatus.allTiersRejected, rejectionReason: "All vendors busy", currentVendorTier: 4, maxVendorTiers: 3),
-    Shipment(shipmentNo: 'SHP007', route: 'Route G - SouthWest', plannedCheckIn: DateTime.now().add(const Duration(days: 1, hours: 9)), shipmentType: 'LTL', shippingType: 'รถกระบะ', doNo: 'DO-1007', shippingConType: '20', status: ShipmentStatus.bookingFinalized, vendorName: "FastDelivery Co.", vehicleRegNo: "BD-5678"),
+    Shipment(shipmentNo: 'SHP001', route: 'Route A - North', plannedCheckIn: DateTime.now().add(const Duration(days: 5, hours: 10)), shipmentType: 'FTL', doNo: 'DO-1001', shippingConType: '20', currentGradeToAssign: VendorGrade.A),
+    Shipment(shipmentNo: 'SHP002', route: 'Route B - East', plannedCheckIn: DateTime.now().add(const Duration(days: 6, hours: 14)), shipmentType: 'LTL', shippingType: 'รถกระบะตู้ทึบ', doNo: 'DO-1002', shippingConType: '20', currentGradeToAssign: VendorGrade.B, status: ShipmentStatus.awaitingVendorConfirmation),
+    Shipment(shipmentNo: 'SHP003', route: 'Route C - West', plannedCheckIn: DateTime.now().add(const Duration(days: 7, hours: 9)), shipmentType: 'FTL', shippingType: 'รถบรรทุก 10 ล้อ', doNo: 'DO-1003', shippingConType: '20', status: ShipmentStatus.awaitingVendorConfirmation, currentGradeToAssign: VendorGrade.A),
+    Shipment(shipmentNo: 'SHP004', route: 'Route D - South', plannedCheckIn: DateTime.now().add(const Duration(days: 8, hours: 16)), shipmentType: 'FTL', shippingType: 'รถพ่วง', doNo: 'DO-1004', shippingConType: '20', status: ShipmentStatus.confirmedByVendor, vendorName: 'GoodTransporter A', assignedVendorId: "V001A", confirmedByGrade: VendorGrade.A, vehicleRegNo: 'กท-1234A'),
+    Shipment(shipmentNo: 'SHP005', route: 'Route E - Central', plannedCheckIn: DateTime.now().add(const Duration(days: 2, hours: 11)), shipmentType: 'FTL', doNo: 'DO-1005', shippingConType: '20', status: ShipmentStatus.readyForBooking, currentGradeToAssign: VendorGrade.C),
+    Shipment(shipmentNo: 'SHP006', route: 'Route F - NorthEast', plannedCheckIn: DateTime.now().add(const Duration(days: 3, hours: 15)), shipmentType: 'FTL', shippingType: 'รถบรรทุก 6 ล้อ', doNo: 'DO-1006', shippingConType: '20', status: ShipmentStatus.allGradesRejected, rejectionReason: "All grades busy", currentGradeToAssign: VendorGrade.D), // Assuming D was the last tried
+    Shipment(shipmentNo: 'SHP007', route: 'Route G - SouthWest', plannedCheckIn: DateTime.now().add(const Duration(days: 1, hours: 9)), shipmentType: 'LTL', shippingType: 'รถกระบะ', doNo: 'DO-1007', shippingConType: '20', status: ShipmentStatus.bookingFinalized, vendorName: "FastDelivery B Co.", assignedVendorId: "V007B", confirmedByGrade: VendorGrade.B, vehicleRegNo: "BD-5678B"),
     Shipment(shipmentNo: 'SHP008', route: 'Route H - Metro', plannedCheckIn: DateTime.now().add(const Duration(days: 4, hours: 13)), shipmentType: 'FTL', shippingType: 'รถบรรทุก 10 ล้อ', doNo: 'DO-1008', shippingConType: '20', status: ShipmentStatus.canceledByDispatcher, cancellationReason: "Customer request"),
   ];
 
   List<Shipment> _displayedShipments = [];
   final TextEditingController _filterController = TextEditingController();
-  // FIX: prefer_final_fields
   final Set<ShipmentStatus> _activeStatusFilters = {};
-
   final List<ShipmentStatus> _filterableStatuses = [
-    ShipmentStatus.readyForBooking,
-    ShipmentStatus.awaitingVendorConfirmation,
-    ShipmentStatus.confirmedByVendor,
-    ShipmentStatus.allTiersRejected,
-    ShipmentStatus.bookingFinalized,
-    ShipmentStatus.canceledByDispatcher,
+    ShipmentStatus.readyForBooking, ShipmentStatus.awaitingVendorConfirmation,
+    ShipmentStatus.confirmedByVendor, ShipmentStatus.allGradesRejected,
+    ShipmentStatus.bookingFinalized, ShipmentStatus.canceledByDispatcher,
   ];
 
   @override
@@ -143,26 +174,44 @@ class _ShipmentPageState extends State<ShipmentPage> {
         tempFiltered = tempFiltered.where((s) => _activeStatusFilters.contains(s.status)).toList();
       }
 
-      if (_currentUserRole == UserRole.vendor) {
-        _displayedShipments = tempFiltered
-            .where((s) => s.status == ShipmentStatus.awaitingVendorConfirmation)
+      if (_currentUserRole == UserRole.vendor && _currentVendorUser != null) {
+        _displayedShipments = tempFiltered.where((s) =>
+                s.status == ShipmentStatus.awaitingVendorConfirmation &&
+                s.currentGradeToAssign == _currentVendorUser!.grade)
             .toList();
-      } else {
+      } else if (_currentUserRole == UserRole.dispatcher) {
         _displayedShipments = tempFiltered;
+      } else {
+        _displayedShipments = [];
       }
     });
   }
 
   void _toggleStatusFilter(ShipmentStatus status) {
     setState(() {
-      if (_activeStatusFilters.contains(status)) {
-        _activeStatusFilters.remove(status);
-      } else {
-        _activeStatusFilters.add(status);
-      }
+      // ignore: curly_braces_in_flow_control_structures
+      if (_activeStatusFilters.contains(status)) _activeStatusFilters.remove(status);
+      // ignore: curly_braces_in_flow_control_structures
+      else _activeStatusFilters.add(status);
       _updateDisplayedShipments(_filterController.text);
     });
   }
+
+  // Simulate fetching vendor details based on Firebase UID (replace with actual API call)
+  Future<void> _simulateFetchCurrentVendorDetails(String firebaseUid, VendorGrade grade) async {
+     // This is a MOCK. In a real app, you'd call your backend.
+    setState(() {
+      _currentVendorUser = VendorUser(
+        firebaseUid: firebaseUid,
+        vendorId: "SIM-${_getGradeText(grade).toUpperCase()}${firebaseUid.substring(0,3)}",
+        name: "Simulated Vendor ${_getGradeText(grade)}",
+        grade: grade,
+        email: "vendor${_getGradeText(grade)}@example.com",
+      );
+      _updateDisplayedShipments(); // Refresh list for this vendor's grade
+    });
+  }
+
 
   void _switchUserRole(UserRole? newRole) {
     if (newRole != null) {
@@ -170,20 +219,33 @@ class _ShipmentPageState extends State<ShipmentPage> {
         _currentUserRole = newRole;
         _filterController.clear();
         _activeStatusFilters.clear();
+        if (newRole == UserRole.vendor) {
+          // Default to simulating Vendor Grade A when switching to Vendor role
+          // In a real app, this would come from the logged-in user's profile
+          _simulateFetchCurrentVendorDetails("simulated_vendor_uid", VendorGrade.A);
+        } else {
+          _currentVendorUser = null;
+        }
         _updateDisplayedShipments();
       });
     }
   }
 
+  // For simulation: allow switching the grade of the current vendor view
+  void _switchVendorGradeView(VendorGrade? grade) {
+    if (grade != null && _currentUserRole == UserRole.vendor) {
+       _simulateFetchCurrentVendorDetails("simulated_vendor_uid_for_${_getGradeText(grade)}", grade);
+    }
+  }
+
+
   void _showSnackbar(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void setShipmentShippingType(Shipment shipment, String? newType) {
      setState(() {
-      final originalShipment = _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo);
-      originalShipment.shippingType = newType;
+      _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo).shippingType = newType;
       _updateDisplayedShipments(_filterController.text);
     });
   }
@@ -194,20 +256,23 @@ class _ShipmentPageState extends State<ShipmentPage> {
       return;
     }
     setState(() {
-      shipment.status = ShipmentStatus.awaitingVendorConfirmation;
-      shipment.currentVendorTier = 1;
-      shipment.vendorName = null;
-      shipment.vehicleRegNo = null;
-      shipment.rejectionReason = null;
+      final targetShipment = _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo);
+      targetShipment.status = ShipmentStatus.awaitingVendorConfirmation;
+      targetShipment.currentGradeToAssign = targetShipment.gradeAssignmentOrder.first; // Start with the first grade in order
+      targetShipment.vendorName = null;
+      targetShipment.assignedVendorId = null;
+      targetShipment.confirmedByGrade = null;
+      targetShipment.vehicleRegNo = null;
+      targetShipment.rejectionReason = null;
       _showSnackbar(
-          'Requesting ${shipment.shippingType} for ${shipment.shipmentNo} (Tier ${shipment.currentVendorTier})...');
+          'Requesting ${targetShipment.shippingType} for ${targetShipment.shipmentNo} (to Grade ${_getGradeText(targetShipment.currentGradeToAssign)})...');
       _updateDisplayedShipments(_filterController.text);
     });
   }
 
   void finalizeBooking(Shipment shipment) {
      setState(() {
-      shipment.status = ShipmentStatus.bookingFinalized;
+      _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo).status = ShipmentStatus.bookingFinalized;
       _showSnackbar(
           'Booking for ${shipment.shipmentNo} finalized with ${shipment.vendorName}. Data to DB/SAP.');
       _updateDisplayedShipments(_filterController.text);
@@ -216,58 +281,87 @@ class _ShipmentPageState extends State<ShipmentPage> {
 
   void cancelBookingByDispatcher(Shipment shipment) {
     setState(() {
-      shipment.status = ShipmentStatus.canceledByDispatcher;
-      shipment.cancellationReason = "Cancelled by Dispatcher";
+      final targetShipment = _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo);
+      targetShipment.status = ShipmentStatus.canceledByDispatcher;
+      targetShipment.cancellationReason = "Cancelled by Dispatcher";
       _showSnackbar(
-          'Booking for ${shipment.shipmentNo} canceled. Vendor ${shipment.vendorName ?? ''} notified.');
+          'Booking for ${targetShipment.shipmentNo} canceled. Vendor ${targetShipment.vendorName ?? ''} notified.');
       _updateDisplayedShipments(_filterController.text);
     });
   }
 
   void confirmByVendor(Shipment shipment) {
+    if (_currentVendorUser == null) {
+      _showSnackbar("Vendor information not available.");
+      return;
+    }
+    if (shipment.currentGradeToAssign != _currentVendorUser!.grade) {
+      _showSnackbar("Error: This shipment is not assigned to your grade (${_getGradeText(_currentVendorUser!.grade)}).");
+      return;
+    }
+
     setState(() {
-      shipment.status = ShipmentStatus.confirmedByVendor;
-      shipment.vendorName = "Vendor Tier ${shipment.currentVendorTier} Ltd.";
-      shipment.vehicleRegNo = "VT${shipment.currentVendorTier}-${UniqueKey().toString().substring(0, 4).toUpperCase()}";
+      final targetShipment = _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo);
+      targetShipment.status = ShipmentStatus.confirmedByVendor;
+      targetShipment.vendorName = _currentVendorUser!.name;
+      targetShipment.assignedVendorId = _currentVendorUser!.vendorId;
+      targetShipment.confirmedByGrade = _currentVendorUser!.grade;
+      targetShipment.vehicleRegNo = "GR${_getGradeText(_currentVendorUser!.grade)}-${UniqueKey().toString().substring(0, 4).toUpperCase()}";
       _showSnackbar(
-          '${shipment.shipmentNo} confirmed by ${shipment.vendorName}.');
+          '${targetShipment.shipmentNo} confirmed by ${targetShipment.vendorName} (Grade ${_getGradeText(targetShipment.confirmedByGrade!)}).');
       _updateDisplayedShipments(_filterController.text);
     });
   }
 
   void rejectByVendor(Shipment shipment) {
+    if (_currentVendorUser == null) {
+      _showSnackbar("Vendor information not available.");
+      return;
+    }
+     if (shipment.currentGradeToAssign != _currentVendorUser!.grade) {
+      _showSnackbar("Error: This shipment is not assigned to your grade (${_getGradeText(_currentVendorUser!.grade)}).");
+      return;
+    }
+
     setState(() {
-      String oldVendorName = "Vendor Tier ${shipment.currentVendorTier}";
-      shipment.rejectionReason = "Vehicle unavailable by $oldVendorName";
-      _showSnackbar('${shipment.shipmentNo} rejected by $oldVendorName.');
+      final targetShipment = _allShipments.firstWhere((s) => s.shipmentNo == shipment.shipmentNo);
+      String rejectedGradeStr = _getGradeText(targetShipment.currentGradeToAssign);
+      targetShipment.rejectionReason = "Rejected by Grade $rejectedGradeStr Vendor: ${_currentVendorUser!.name} (Simulated: Vehicle unavailable)";
+      _showSnackbar('${targetShipment.shipmentNo} rejected by Grade $rejectedGradeStr Vendor: ${_currentVendorUser!.name}.');
 
-      shipment.currentVendorTier++;
+      VendorGrade? nextGrade = targetShipment.getNextGradeToAssignInOrder();
 
-      if (shipment.currentVendorTier <= shipment.maxVendorTiers) {
-        shipment.status = ShipmentStatus.awaitingVendorConfirmation;
-        shipment.vendorName = null;
-        shipment.vehicleRegNo = null;
+      if (nextGrade != null) {
+        targetShipment.status = ShipmentStatus.awaitingVendorConfirmation;
+        targetShipment.currentGradeToAssign = nextGrade;
+        targetShipment.vendorName = null;
+        targetShipment.assignedVendorId = null;
+        targetShipment.confirmedByGrade = null;
+        targetShipment.vehicleRegNo = null;
         _showSnackbar(
-            'Forwarding ${shipment.shipmentNo} to next vendor tier (${shipment.currentVendorTier}/${shipment.maxVendorTiers})...');
+            'Forwarding ${targetShipment.shipmentNo} to next Grade: ${_getGradeText(nextGrade)}...');
       } else {
-        shipment.status = ShipmentStatus.allTiersRejected;
+        targetShipment.status = ShipmentStatus.allGradesRejected;
         _showSnackbar(
-            '${shipment.shipmentNo}: All ${shipment.maxVendorTiers} vendor tiers rejected.');
+            '${targetShipment.shipmentNo}: All assigned grades rejected. Requires dispatcher review.');
       }
       _updateDisplayedShipments(_filterController.text);
     });
   }
 
-  String _getStatusText(ShipmentStatus status, [int? currentTier, int? maxTiers]) {
+  String _getGradeText(VendorGrade? grade) {
+    if (grade == null) return 'N/A';
+    return grade.toString().split('.').last;
+  }
+
+  String _getStatusText(ShipmentStatus status, [VendorGrade? currentAssignGrade, VendorGrade? confirmedGrade]) {
     switch (status) {
       case ShipmentStatus.readyForBooking: return 'Ready for Booking';
       case ShipmentStatus.awaitingVendorConfirmation:
-        if (currentTier != null && maxTiers != null) {
-          return 'Awaiting Vendor (Tier $currentTier/$maxTiers)';
-        }
-        return 'Awaiting Vendor';
-      case ShipmentStatus.confirmedByVendor: return 'Confirmed by Vendor';
-      case ShipmentStatus.allTiersRejected: return 'All Tiers Rejected';
+        return 'Awaiting Vendor (Grade ${_getGradeText(currentAssignGrade)})';
+      case ShipmentStatus.confirmedByVendor:
+        return 'Confirmed (Grade ${_getGradeText(confirmedGrade)})';
+      case ShipmentStatus.allGradesRejected: return 'All Grades Rejected';
       case ShipmentStatus.bookingFinalized: return 'Booking Finalized';
       case ShipmentStatus.canceledByDispatcher: return 'Canceled';
     }
@@ -278,7 +372,7 @@ class _ShipmentPageState extends State<ShipmentPage> {
       case ShipmentStatus.readyForBooking: return Colors.blueGrey;
       case ShipmentStatus.awaitingVendorConfirmation: return Colors.orange;
       case ShipmentStatus.confirmedByVendor: return Colors.green;
-      case ShipmentStatus.allTiersRejected: return Colors.red.shade700;
+      case ShipmentStatus.allGradesRejected: return Colors.red.shade700;
       case ShipmentStatus.bookingFinalized: return Colors.purple;
       case ShipmentStatus.canceledByDispatcher: return Colors.amber.shade700;
     }
@@ -289,11 +383,22 @@ class _ShipmentPageState extends State<ShipmentPage> {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            'ระบบจองรถ - ${_currentUserRole == UserRole.dispatcher ? "Dispatcher View" : "Vendor View"}'),
+        title: Text('ระบบจองรถ - ${_currentUserRole == UserRole.dispatcher ? "Dispatcher" : "Vendor (Grade ${_currentVendorUser != null ? _getGradeText(_currentVendorUser!.grade) : 'Select'})"} View'),
         backgroundColor: colorScheme.primaryContainer,
         actions: [
-           PopupMenuButton<UserRole>(
+          if (_currentUserRole == UserRole.vendor)
+            PopupMenuButton<VendorGrade>(
+              icon: const Icon(Icons.stairs_outlined),
+              tooltip: "Switch Vendor Grade View (Simulated)",
+              onSelected: _switchVendorGradeView,
+              itemBuilder: (BuildContext context) => VendorGrade.values
+                  .where((g) => g != VendorGrade.unassigned)
+                  .map((grade) => PopupMenuItem<VendorGrade>(
+                        value: grade,
+                        child: Text('View as Grade ${_getGradeText(grade)}'),
+                      )).toList(),
+            ),
+          PopupMenuButton<UserRole>(
             icon: const Icon(Icons.people_alt_outlined),
             onSelected: _switchUserRole,
             itemBuilder: (BuildContext context) => <PopupMenuEntry<UserRole>>[
@@ -308,7 +413,7 @@ class _ShipmentPageState extends State<ShipmentPage> {
           if (_currentUserRole == UserRole.dispatcher) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 0),
-              child: TextField(
+              child: TextField( /* ... Search Bar ... */
                 controller: _filterController,
                 decoration: InputDecoration(
                   labelText: 'Search Shipments...',
@@ -321,20 +426,16 @@ class _ShipmentPageState extends State<ShipmentPage> {
                 onChanged: (query) => _updateDisplayedShipments(query),
               ),
             ),
-            Padding(
+            Padding( /* ... Filter Chips ... */
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
               child: Wrap(
-                spacing: 8.0,
-                runSpacing: 4.0,
+                spacing: 8.0, runSpacing: 4.0,
                 children: _filterableStatuses.map((status) {
                   final bool isSelected = _activeStatusFilters.contains(status);
                   return FilterChip(
-                    label: Text(_getStatusText(status)),
+                    label: Text(_getStatusText(status, null,null)), // Pass nulls as grade is not relevant for general status text here
                     selected: isSelected,
-                    onSelected: (bool selected) {
-                      _toggleStatusFilter(status);
-                    },
-                    // FIX: deprecated_member_use
+                    onSelected: (bool selected) => _toggleStatusFilter(status),
                     selectedColor: _getStatusColor(status).withAlpha((255 * 0.3).round()),
                     checkmarkColor: _getStatusColor(status),
                     side: isSelected ? BorderSide.none : BorderSide(color: Colors.grey.shade400),
@@ -343,12 +444,14 @@ class _ShipmentPageState extends State<ShipmentPage> {
               ),
             ),
           ],
-           if (_currentUserRole == UserRole.vendor && _displayedShipments.isEmpty)
-            Expanded(child: Center(child: Text("No pending actions for you.", style: Theme.of(context).textTheme.titleMedium)))
-          else if (_currentUserRole == UserRole.vendor && _displayedShipments.isNotEmpty)
+          if (_currentUserRole == UserRole.vendor && _currentVendorUser == null)
+             Expanded(child: Center(child: Text("Select a vendor grade to view tasks.", style: Theme.of(context).textTheme.titleMedium)))
+          else if (_currentUserRole == UserRole.vendor && _displayedShipments.isEmpty)
+            Expanded(child: Center(child: Text("No pending actions for Grade ${_getGradeText(_currentVendorUser?.grade)}.", style: Theme.of(context).textTheme.titleMedium)))
+          else if (_currentUserRole == UserRole.vendor && _displayedShipments.isNotEmpty && _currentVendorUser != null)
              Padding(
                padding: const EdgeInsets.all(8.0),
-               child: Text("Shipments awaiting your confirmation (Tier ${_displayedShipments.first.currentVendorTier}):", style: Theme.of(context).textTheme.titleSmall,),
+               child: Text("Shipments awaiting Grade ${_getGradeText(_currentVendorUser!.grade)} confirmation:", style: Theme.of(context).textTheme.titleSmall,),
              ),
           Expanded(
             child: _displayedShipments.isEmpty && _currentUserRole == UserRole.dispatcher && (_filterController.text.isNotEmpty || _activeStatusFilters.isNotEmpty)
@@ -360,6 +463,7 @@ class _ShipmentPageState extends State<ShipmentPage> {
                 return ShipmentCard(
                   shipment: shipment,
                   currentUserRole: _currentUserRole,
+                  currentVendorUser: _currentVendorUser,
                   availableVehicleTypes: _availableVehicleTypes,
                   onAction: (action, shipment, [dynamic value]) {
                     switch (action) {
@@ -385,6 +489,7 @@ class _ShipmentPageState extends State<ShipmentPage> {
 class ShipmentCard extends StatelessWidget {
   final Shipment shipment;
   final UserRole currentUserRole;
+  final VendorUser? currentVendorUser;
   final List<String> availableVehicleTypes;
   final Function(String action, Shipment shipment, [dynamic value]) onAction;
 
@@ -392,27 +497,33 @@ class ShipmentCard extends StatelessWidget {
     super.key,
     required this.shipment,
     required this.currentUserRole,
+    this.currentVendorUser,
     required this.availableVehicleTypes,
     required this.onAction,
   });
+
+  String _getGradeTextForDisplay(VendorGrade? grade) {
+    if (grade == null) return 'N/A';
+    return grade.toString().split('.').last;
+  }
 
    Color _getStatusColor(ShipmentStatus status, BuildContext context) {
      switch (status) {
       case ShipmentStatus.readyForBooking: return Colors.blueGrey;
       case ShipmentStatus.awaitingVendorConfirmation: return Colors.orange;
       case ShipmentStatus.confirmedByVendor: return Colors.green;
-      case ShipmentStatus.allTiersRejected: return Colors.red.shade700;
+      case ShipmentStatus.allGradesRejected: return Colors.red.shade700;
       case ShipmentStatus.bookingFinalized: return Colors.purple;
       case ShipmentStatus.canceledByDispatcher: return Colors.amber.shade700;
     }
   }
 
-   String _getStatusText(ShipmentStatus status, int currentTier, int maxTiers) {
+   String _getStatusText(ShipmentStatus status, VendorGrade currentAssignGrade, VendorGrade? confirmedByGrade) {
      switch (status) {
       case ShipmentStatus.readyForBooking: return 'Ready for Booking';
-      case ShipmentStatus.awaitingVendorConfirmation: return 'Awaiting Vendor (T$currentTier/$maxTiers)';
-      case ShipmentStatus.confirmedByVendor: return 'Confirmed';
-      case ShipmentStatus.allTiersRejected: return 'All Tiers Rejected';
+      case ShipmentStatus.awaitingVendorConfirmation: return 'Awaiting (Grade ${_getGradeTextForDisplay(currentAssignGrade)})';
+      case ShipmentStatus.confirmedByVendor: return 'Confirmed (Grade ${_getGradeTextForDisplay(confirmedByGrade)})';
+      case ShipmentStatus.allGradesRejected: return 'All Grades Rejected';
       case ShipmentStatus.bookingFinalized: return 'Finalized';
       case ShipmentStatus.canceledByDispatcher: return 'Canceled';
     }
@@ -441,12 +552,11 @@ class ShipmentCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                      // FIX: deprecated_member_use
                       color: _getStatusColor(shipment.status, context).withAlpha((255 * 0.15).round()),
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(color: _getStatusColor(shipment.status, context))),
                   child: Text(
-                    _getStatusText(shipment.status, shipment.currentVendorTier, shipment.maxVendorTiers),
+                    _getStatusText(shipment.status, shipment.currentGradeToAssign, shipment.confirmedByGrade),
                     style: TextStyle(
                         color: _getStatusColor(shipment.status, context),
                         fontWeight: FontWeight.bold,
@@ -475,13 +585,13 @@ class ShipmentCard extends StatelessWidget {
               if (shipment.vendorName != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4.0),
-                  child: Text('Vendor: ${shipment.vendorName}',
+                  child: Text('Vendor: ${shipment.vendorName} (Grade ${_getGradeTextForDisplay(shipment.confirmedByGrade)})',
                       style: TextStyle(color: Colors.teal.shade600, fontWeight: FontWeight.w500, fontSize: 11)),
                 ),
               if (shipment.vehicleRegNo != null)
                 Text('Veh.No: ${shipment.vehicleRegNo}',
                     style: TextStyle(color: Colors.teal.shade600, fontWeight: FontWeight.w500, fontSize: 11)),
-              if (shipment.status == ShipmentStatus.allTiersRejected && shipment.rejectionReason != null)
+              if (shipment.status == ShipmentStatus.allGradesRejected && shipment.rejectionReason != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Text('Last Rejection: ${shipment.rejectionReason}',
@@ -507,7 +617,6 @@ class ShipmentCard extends StatelessWidget {
 
   Widget _buildActionButtons(BuildContext context, ColorScheme colorScheme) {
     List<Widget> actionWidgets = [];
-    // FIX: non_constant_identifier_names
     ButtonStyle rButtonStyle = ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: colorScheme.onPrimary, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), textStyle: const TextStyle(fontSize: 12));
     ButtonStyle fButtonStyle = ElevatedButton.styleFrom(backgroundColor: colorScheme.secondary, foregroundColor: colorScheme.onSecondary, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), textStyle: const TextStyle(fontSize: 12));
     TextStyle vcTextStyle = TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 12);
@@ -518,53 +627,47 @@ class ShipmentCard extends StatelessWidget {
     if (currentUserRole == UserRole.dispatcher) {
       if (shipment.status == ShipmentStatus.readyForBooking) {
         actionWidgets.add(
-          Expanded(
+          Expanded( /* ... Dropdown for vehicle type ... */
             child: DropdownButtonFormField<String>(
               isExpanded: true,
               decoration: InputDecoration(
-                labelText: 'Vehicle Type',
-                hintStyle: const TextStyle(fontSize: 12),
-                labelStyle: const TextStyle(fontSize: 12),
+                labelText: 'Vehicle Type', hintStyle: const TextStyle(fontSize: 12), labelStyle: const TextStyle(fontSize: 12),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), isDense: true,
               ),
               style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodyLarge?.color),
-              value: shipment.shippingType,
-              hint: const Text('Select Vehicle'),
-              items: availableVehicleTypes.map((String value) {
-                return DropdownMenuItem<String>( value: value, child: Text(value, overflow: TextOverflow.ellipsis));
-              }).toList(),
+              value: shipment.shippingType, hint: const Text('Select Vehicle'),
+              items: availableVehicleTypes.map((String value) => DropdownMenuItem<String>( value: value, child: Text(value, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (String? newValue) { onAction("setShippingType", shipment, newValue); },
             ),
           ),
         );
         actionWidgets.add(const SizedBox(width: 8));
         actionWidgets.add(ElevatedButton(
-            style: rButtonStyle, // Use corrected name
-            onPressed: shipment.shippingType != null && shipment.shippingType!.isNotEmpty
-                ? () => onAction("requestBooking", shipment) : null,
+            style: rButtonStyle,
+            onPressed: shipment.shippingType != null && shipment.shippingType!.isNotEmpty ? () => onAction("requestBooking", shipment) : null,
             child: const Text('Request')));
       }
       if (shipment.status == ShipmentStatus.confirmedByVendor) {
-        actionWidgets.add(ElevatedButton(style: fButtonStyle, onPressed: () => onAction("finalizeBooking", shipment), child: const Text('Finalize'))); // Use corrected name
+        actionWidgets.add(ElevatedButton(style: fButtonStyle, onPressed: () => onAction("finalizeBooking", shipment), child: const Text('Finalize')));
         actionWidgets.add(const SizedBox(width: 8));
         bool canCancel = shipment.plannedCheckIn.isAfter(DateTime.now());
         actionWidgets.add(TextButton(onPressed: canCancel ? () => onAction("cancelByDispatcher", shipment) : null,
-            child: Text('Cancel', style: canCancel ? dcTextStyle : disabledTextStyle))); // Use corrected names
+            child: Text('Cancel', style: canCancel ? dcTextStyle : disabledTextStyle)));
       }
-      if (shipment.status == ShipmentStatus.allTiersRejected) {
-        actionWidgets.add(ElevatedButton(style: rButtonStyle, onPressed: () => onAction("requestBooking", shipment), child: const Text('Re-Attempt'))); // Use corrected name
+      if (shipment.status == ShipmentStatus.allGradesRejected) {
+        actionWidgets.add(ElevatedButton(style: rButtonStyle, onPressed: () => onAction("requestBooking", shipment), child: const Text('Re-Attempt')));
         actionWidgets.add(const SizedBox(width: 8));
         actionWidgets.add(TextButton(onPressed: () => onAction("manualAssign", shipment), child: Text("Manual", style: TextStyle(color: colorScheme.tertiary, fontSize: 12))));
       }
-    } else if (currentUserRole == UserRole.vendor) {
-       if (shipment.status == ShipmentStatus.awaitingVendorConfirmation) {
+    } else if (currentUserRole == UserRole.vendor && currentVendorUser != null) {
+       if (shipment.status == ShipmentStatus.awaitingVendorConfirmation &&
+           shipment.currentGradeToAssign == currentVendorUser!.grade) { // Key check
         actionWidgets.add(TextButton(onPressed: () => onAction("confirmByVendor", shipment),
-            child: Text('Confirm (T${shipment.currentVendorTier})', style: vcTextStyle))); // Use corrected name
+            child: Text('Confirm (My Grade: ${_getGradeTextForDisplay(currentVendorUser!.grade)})', style: vcTextStyle)));
         actionWidgets.add(const SizedBox(width: 8));
         actionWidgets.add(TextButton(onPressed: () => onAction("rejectByVendor", shipment),
-            child: Text('Reject (T${shipment.currentVendorTier})', style: vrTextStyle))); // Use corrected name
+            child: Text('Reject (My Grade: ${_getGradeTextForDisplay(currentVendorUser!.grade)})', style: vrTextStyle)));
       }
     }
     if (currentUserRole == UserRole.dispatcher && shipment.status == ShipmentStatus.readyForBooking) {
