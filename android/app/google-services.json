@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "245653745365",
+    "project_id": "thruckbooking",
+    "storage_bucket": "thruckbooking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:245653745365:android:2be72f539404e26a0cbc5c",
+        "android_client_info": {
+          "package_name": "thuck.booing.mock"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTmwMh9-PoeZgkp_s_NhOB6kYcY57ipdE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

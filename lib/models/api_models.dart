@@ -165,24 +165,43 @@ class BookingRound {
   }
 }
 class ShipmentDetail {
-  final String doNumber;
-  final String? shippingAddress;
-  final int? quantity;
-  final double? volume;
+  final String doid; // doidPrimary จาก DB
+  final String shipid;
+  final DateTime dlvdate; // ใช้ DateTime เพื่อจัดการวันที่ได้ง่าย
+  final String cusid;
+  final String cusname;
+  final String route;
+  final String? routedes; // อาจจะเป็น null
+  final String province;
+  final double volumn;
 
   ShipmentDetail({
-    required this.doNumber,
-    this.shippingAddress,
-    this.quantity,
-    this.volume,
+    required this.doid,
+    required this.shipid,
+    required this.dlvdate,
+    required this.cusid,
+    required this.cusname,
+    required this.route,
+    this.routedes,
+    required this.province,
+    required this.volumn,
   });
 
-   factory ShipmentDetail.fromJson(Map<String, dynamic> json) {
+  // factory constructor สำหรับแปลง JSON ที่ได้จาก API
+  factory ShipmentDetail.fromJson(Map<String, dynamic> json) {
     return ShipmentDetail(
-      doNumber: json['do_number'] ?? 'N/A DO',
-      shippingAddress: json['shipping_address'],
-      quantity: json['quantity'],
-      volume: json['volume'] != null ? double.tryParse(json['volume'].toString()) : null,
+      // ***สำคัญ: key ใน json['key'] ต้องตรงกับที่ Backend ส่งมา***
+      doid: json['doid'] ?? 'N/A', 
+      shipid: json['shipid'] ?? 'N/A',
+      // แปลง String date (เช่น '2024-12-25') เป็น DateTime object
+      dlvdate: DateTime.tryParse(json['dlvdate'] ?? '') ?? DateTime.now(),
+      cusid: json['cusid'] ?? 'N/A',
+      cusname: json['cusname'] ?? 'N/A',
+      route: json['route'] ?? 'N/A',
+      routedes: json['routedes'], // รับค่า null ได้
+      province: json['province'] ?? 'N/A',
+      // แปลงค่าที่อาจจะเป็น int หรือ double ให้เป็น double
+      volumn: (json['volumn'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

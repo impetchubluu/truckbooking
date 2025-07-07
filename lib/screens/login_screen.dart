@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // -- Username Field --
-                          Row(
+                          const Row(
                             children: [
                               Icon(Icons.person_outline, color: textColor, size: 20),
                               SizedBox(width: 8),
@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 20),
 
                           // -- Password Field --
-                          Row(
+                          const Row(
                             children: [
                               Icon(Icons.lock_outline, color: textColor, size: 20),
                               SizedBox(width: 8),

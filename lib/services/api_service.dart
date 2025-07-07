@@ -77,6 +77,21 @@ class ApiService {
     }
     throw Exception(result['error']);
   }
+  Future<List<Shipment>> getShipments(String token, {String? docstat}) async {
+    var uri = Uri.parse('$_baseUrl/api/v1/shipments/'); // Endpoint หลัก
+    if (docstat != null) {
+       uri = uri.replace(queryParameters: {'docstat': docstat});
+    }
+
+    final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+    final result = await _handleResponse(response);
+
+    if (result['success']) {
+      final List<dynamic> data = result['data'] ?? [];
+      return data.map((json) => Shipment.fromJson(json)).toList();
+    }
+    throw Exception(result['error']);
+  }
   Future<Shipment> getShipmentDetails(String token, String shipId) async {
     final uri = Uri.parse('$_baseUrl/api/v1/shipments/$shipId');
     final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
@@ -105,5 +120,23 @@ class ApiService {
     }
     // Throw an exception with a detailed error message
     throw Exception(result['error'] ?? 'Failed to request booking');
+  }
+   Future<void> updateFCMToken(String userAccessToken, String fcmToken) async {
+    final uri = Uri.parse('$_baseUrl/users/update-fcm-token');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $userAccessToken',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({'fcm_token': fcmToken}),
+    );
+
+    // เราอาจจะไม่ต้องสนใจ Response มากนักถ้ามันสำเร็จ
+    if (response.statusCode != 200) {
+      // แต่ถ้าไม่สำเร็จ ควรจะ Throw Exception
+      final result = await _handleResponse(response);
+      throw Exception(result['error']);
+    }
   }
 }

@@ -105,7 +105,7 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text('Error: $_errorMessage', style: TextStyle(color: Colors.red)))
+              ? Center(child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red)))
               : _shipment == null
                   ? const Center(child: Text('Shipment not found.'))
                   : _buildDetailsView(),
@@ -186,70 +186,86 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
     );
   }
 
-  Widget _buildDetailsTable(Shipment shipment) {
-    final tableHeaderStyle = TextStyle(fontWeight: FontWeight.bold);
+// Widget นี้จะรับ Shipment ทั้งก้อนเข้ามา
+// แล้วสร้างตารางที่มีหลายแถวจาก shipment.details
+Widget _buildDetailsTable(Shipment shipment) {
+  const tableHeaderStyle = TextStyle(fontWeight: FontWeight.bold, fontSize: 13);
+  const cellTextStyle = TextStyle(fontSize: 12);
 
-    Widget buildCell(String text, {TextAlign align = TextAlign.left, TextStyle? style}) {
-        return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-            child: Text(text, textAlign: align, style: style),
-        );
-    }
-
-    final int totalQuantity = shipment.details.fold(0, (sum, item) => sum + (item.quantity ?? 0));
-    final double totalVolume = shipment.details.fold(0.0, (sum, item) => sum + (item.volume ?? 0.0));
-
-    return Table(
-        border: TableBorder.all(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8)),
-        columnWidths: const {
-            0: FlexColumnWidth(2), 1: FlexColumnWidth(3.5),
-            2: FlexColumnWidth(2), 3: FlexColumnWidth(2),
-        },
-        children: [
-            TableRow(
-                decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8)),
-                ),
-                children: [
-                    buildCell('DO', style: tableHeaderStyle),
-                    buildCell('ที่อยู่จัดส่ง', style: tableHeaderStyle),
-                    buildCell('จำนวนสินค้า', style: tableHeaderStyle, align: TextAlign.right),
-                    buildCell('ปริมาตร', style: tableHeaderStyle, align: TextAlign.right),
-                ]
-            ),
-            ...shipment.details.map((detail) => TableRow(
-                children: [
-                    buildCell(detail.doNumber),
-                    buildCell(detail.shippingAddress ?? ''),
-                    buildCell(detail.quantity?.toString() ?? '', align: TextAlign.right),
-                    buildCell(detail.volume?.toStringAsFixed(2) ?? '', align: TextAlign.right),
-                ]
-            )),
-            if (shipment.details.length < 5)
-                ...List.generate(5 - shipment.details.length, (index) => TableRow(
-                    children: List.generate(4, (_) => buildCell(''))
-                )),
-            TableRow(
-                children: [
-                    buildCell('จำนวนสินค้าทั้งหมด =', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Container(),
-                    buildCell('$totalQuantity', align: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
-                    Container(),
-                ]
-            ),
-            TableRow(
-                 decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.only(bottomLeft: Radius.circular(8), bottomRight: Radius.circular(8)),
-                ),
-                children: [
-                    buildCell('ปริมาตรรวม =', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Container(),
-                    buildCell('${totalVolume.toStringAsFixed(2)} CBM', align: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
-                    Container(),
-                ]
-            ),
-        ],
+  Widget buildHeaderCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(text, style: tableHeaderStyle, textAlign: TextAlign.center),
     );
   }
+
+  Widget buildDataCell(String text, {TextAlign align = TextAlign.left}) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(text, style: cellTextStyle, textAlign: align),
+    );
+  }
+
+  // สร้าง List ของ TableRow สำหรับข้อมูลแต่ละ detail
+  List<TableRow> detailRows = shipment.details.map((detail) {
+    // ดึงข้อมูลจาก 'detail' object
+    final String doid = detail.doid;
+    final String cusname = detail.cusname;
+    final String route = detail.route;
+    final String cusid = detail.cusid;
+    final String routedes= detail.routedes ?? 'N/A'; // ใช้ N/A ถ้า routedes เป็น null
+    final String volumn = detail.volumn.toStringAsFixed(3);
+    final String dlvdate = DateFormat('dd/MM').format(detail.dlvdate);
+
+    return TableRow(
+      // สลับสีพื้นหลังเพื่อให้อ่านง่าย
+      decoration: BoxDecoration(
+        color: shipment.details.indexOf(detail) % 2 == 0 
+               ? Colors.white 
+               : Colors.grey.shade100,
+      ),
+      children: [
+        buildDataCell(doid, align: TextAlign.center),
+        buildDataCell(cusname, align: TextAlign.center),
+        buildDataCell(routedes, align: TextAlign.center),
+        buildDataCell(volumn, align: TextAlign.center),
+      ],
+    );
+  }).toList();
+
+
+  // ถ้าไม่มี details เลย ให้แสดงข้อความแทน
+  if (shipment.details.isEmpty) {
+    return const Padding(
+      padding: EdgeInsets.all(16.0),
+      child: Center(child: Text('No delivery details found.')),
+    );
+  }
+
+  // ประกอบตารางทั้งหมดเข้าด้วยกัน
+  return Table(
+    border: TableBorder.all(color: Colors.grey.shade300, width: 1),
+    columnWidths: const {
+      0: FlexColumnWidth(1.8), // DO ID
+      1: FlexColumnWidth(3),   // Customer Name
+      2: FlexColumnWidth(1.8), // Date
+      3: FlexColumnWidth(1.3), // Volume
+    },
+    children: [
+      // 1. Header Row
+      TableRow(
+        decoration: BoxDecoration(color: Colors.grey.shade200),
+        children: [
+          buildHeaderCell('DO ID'),
+          buildHeaderCell('Customer'),
+          buildHeaderCell('Routedes'),
+          buildHeaderCell('Volume'),
+        ],
+      ),
+      
+      
+      ...detailRows,
+    ],
+  );
+}
 }

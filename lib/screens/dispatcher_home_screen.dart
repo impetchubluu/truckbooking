@@ -297,7 +297,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                                         children: [
                                           Text('Shipment ${shipment.shipid}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                           Text('Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}  คลัง : ${shipment.provname ?? 'N/A'}'), // ใช้ apmdate จริง
-                                          Text('รถ 4 ล้อ, จัดส่งจังหวัดปลายทางกรุงเทพ'), // Example detail line
+                                          const Text('รถ 4 ล้อ, จัดส่งจังหวัดปลายทางกรุงเทพ'), // Example detail line
                                         ],
                                       ),
                                     ),

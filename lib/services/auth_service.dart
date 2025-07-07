@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
+
 class AuthService {
   static const String _androidEmulatorBaseUrl = "http://10.0.2.2:5000";
   static const String _iosSimulatorDesktopBaseUrl = "http://localhost:5000";
@@ -28,7 +29,7 @@ class AuthService {
   Future<Map<String, dynamic>> login(String username, String password) async {
     final String apiUrl = "$baseUrl/auth/login";
     print('AuthService: Attempting to login to: $apiUrl');
-
+  
     try {
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -41,10 +42,13 @@ class AuthService {
       print('AuthService: Login Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
+        
+     
         return {'success': true, 'data': responseData};
       } else {
         return {'success': false, 'error': responseData['detail'] ?? 'Login failed (Status: ${response.statusCode})'};
       }
+      
     } catch (e) {
       print('AuthService: Login Exception: $e');
       return {'success': false, 'error': 'Could not connect to server. Please check your connection.'};

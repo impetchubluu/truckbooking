@@ -1,10 +1,17 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
-
-void main() {
+import 'firebase_options.dart';
+import 'services/notification_service.dart';
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await NotificationService().initialize();
   runApp(
     ChangeNotifierProvider(
       create: (context) => AuthProvider(),
@@ -26,8 +33,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF404E88)),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey.shade100, // สีพื้นหลังทั่วไป (ไม่ใช่หน้า Login)
-        appBarTheme: AppBarTheme(
-          backgroundColor: const Color(0xFF404E88), // สี AppBar
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF404E88), // สี AppBar
           foregroundColor: Colors.white, // สีตัวอักษรและไอคอนบน AppBar
           elevation: 2,
         ),
