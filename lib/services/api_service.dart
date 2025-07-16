@@ -54,7 +54,16 @@ class ApiService {
 
   Future<List<Shipment>> getUnassignedShipments(String token, DateTime date, String shippoint) async {
     final dateString = DateFormat('yyyy-MM-dd').format(date);
-    final uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=$shippoint');
+    Uri uri;
+    if (shippoint == 'SW') {
+      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=1000');
+    }
+    else if (shippoint == 'WH7') {
+      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=1001');
+    } else {
+      // ถ้า shippoint ไม่ใช่ SW หรือ NW ให้ใช้ค่าเริ่มต้น
+      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=$shippoint');
+    }
     final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
     final result = await _handleResponse(response);
     if (result['success'] == true) {
@@ -139,4 +148,45 @@ class ApiService {
       throw Exception(result['error']);
     }
   }
+    Future<List<MasterBookingRound>> getMasterBookingRounds(String token) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/master/booking-rounds');
+    final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+    final result = await _handleResponse(response);
+
+    if (result['success']) {
+      final List<dynamic> data = result['data'] ?? [];
+      return data.map((json) => MasterBookingRound.fromJson(json)).toList();
+    }
+    throw Exception(result['error']);
+  }
+
+  Future<bool> saveDayRounds(String token, SaveDayRoundsRequestData data) async {
+     final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/save-for-day');
+     final response = await http.post(
+         uri,
+         headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+         body: json.encode(data.toJson()),
+     );
+     final result = await _handleResponse(response);
+     return result['success'];
+  }
+}
+
+// เพิ่ม Model สำหรับ Request Data ใน lib/models/api_models.dart ด้วย
+class SaveDayRoundsRequestData {
+    final DateTime roundDate;
+    final String warehouseCode;
+    final List<Map<String, String>> rounds; // e.g. [{"round_time_str": "10:00"}]
+
+    SaveDayRoundsRequestData({
+        required this.roundDate,
+        required this.warehouseCode,
+        required this.rounds,
+    });
+
+    Map<String, dynamic> toJson() => {
+        'round_date': DateFormat('yyyy-MM-dd').format(roundDate),
+        'warehouse_code': warehouseCode,
+        'rounds': rounds,
+    };
 }

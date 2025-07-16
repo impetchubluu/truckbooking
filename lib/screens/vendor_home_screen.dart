@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
-// import 'vendor_job_detail_screen.dart'; // TODO: สร้างหน้านี้ในอนาคต
 
 class VendorHomeScreen extends StatefulWidget {
   const VendorHomeScreen({super.key});
@@ -109,8 +108,8 @@ class _VendorHomeScreenState extends State<VendorHomeScreen> {
                          const Text('You have no new job assignments at the moment.'),
                          const SizedBox(height: 20),
                          OutlinedButton.icon(
-                             icon: Icon(Icons.refresh),
-                             label: Text("Refresh"),
+                             icon: const Icon(Icons.refresh),
+                             label: const Text("Refresh"),
                              onPressed: _refreshJobs,
                          )
                      ],
@@ -133,7 +132,6 @@ class _VendorHomeScreenState extends State<VendorHomeScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12.0),
         onTap: () {
-          // TODO: Navigate to VendorJobDetailScreen
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Viewing details for Shipment ${shipment.shipid}')),
           );
@@ -156,11 +154,11 @@ class _VendorHomeScreenState extends State<VendorHomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'นัดรับสินค้า: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}', // TODO: ใช้ shipment.apmdate จริง
+                'นัดรับสินค้า: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
                 style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
               ),
               Text(
-                'ประเภทรถ: ${shipment.shiptypeDesc ?? 'N/A'}',
+                'ประเภทรถ: ${shipment.cartype ?? 'N/A'}',
                 style: theme.textTheme.bodyMedium,
               ),
               const Divider(height: 20),

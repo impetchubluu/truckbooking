@@ -1,3 +1,5 @@
+// ignore_for_file: library_private_types_in_public_api, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -177,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     // --- Help Link ---
                     TextButton(
                       onPressed: () {
-                        // TODO: Implement Help logic or navigation
+                        // TODO: 
                       },
                       child: Text(
                         'Help',

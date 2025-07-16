@@ -23,7 +23,7 @@ dependencies:
 
   # (Optional, but recommended for production to securely store tokens)
   # flutter_secure_storage: ^9.0.0
-
+  shared_preferences: ^2.0.8
   cupertino_icons: ^1.0.2
   firebase_core: ^3.15.1
   firebase_messaging: ^15.2.9

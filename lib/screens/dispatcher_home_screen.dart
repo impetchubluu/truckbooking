@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:truck_booking_app/screens/manage_round_screen.dart';
 import 'package:truck_booking_app/screens/shipment_detail_screen.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
@@ -30,7 +31,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
   String? _errorMessage;
   DateTime _selectedDate = DateTime.now();
   String? _selectedWarehouseCode;
-
+  String? warehouse;
   List<Warehouse> _warehouses = [];
   List<BookingRound> _bookingRounds = [];
   List<Shipment> _unassignedShipments = [];
@@ -221,12 +222,27 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
               children: [
                 Text("กำหนดรอบการจอง", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 OutlinedButton(
-                  onPressed: () {
-                    // TODO: Navigate to ManageRoundsScreen
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Navigate to Manage Rounds page')));
-                  },
-                  child: const Text("Manage")
-                ),
+  onPressed: () async {
+    // Navigate ไปยังหน้า ManageRoundsScreen
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => ManageRoundsScreen(
+          accessToken: widget.accessToken,
+          selectedDate: _selectedDate,
+          warehouseCode: _selectedWarehouseCode!,
+          initialRounds: _bookingRounds,
+        ),
+        fullscreenDialog: true, // ทำให้หน้านี้เปิดแบบ Modal
+      ),
+    );
+
+    // ถ้ามีการ Save สำเร็จ (pop กลับมาเป็น true) ให้ Refresh ข้อมูล
+    if (result == true) {
+      _fetchDataForSelectedFilters();
+    }
+  },
+  child: const Text("Manage")
+),
               ],
             ),
             if (_bookingRounds.isEmpty && !_isLoading)
@@ -246,7 +262,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
     return ListTile(
       dense: true,
       title: Text(round.name),
-      subtitle: Text("เวลา: ${round.time.format(context)}, จำนวน ${round.shipments.length} รายการ"),
+      subtitle: Text("เวลา: ${round.time?.format(context)}, จำนวน ${round.shipments.length} รายการ"),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: () {
         // TODO: Navigate to RoundDetailScreen(roundId: round.id)
@@ -277,71 +293,77 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                           ),
                         )
                       : ListView.builder(
-                          itemCount: _unassignedShipments.length,
-                          itemBuilder: (context, index) {
-                            final shipment = _unassignedShipments[index];
-                            final bool isOnHold = shipment.isOnHold;
-                            return Card(
-                              color: isOnHold ? Colors.grey.shade200 : Colors.blue.shade50,
-                              margin: const EdgeInsets.symmetric(vertical: 5),
-                              elevation: 1,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.local_shipping_outlined, color: Colors.grey.shade700, size: 28),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('Shipment ${shipment.shipid}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          Text('Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}  คลัง : ${shipment.provname ?? 'N/A'}'), // ใช้ apmdate จริง
-                                          const Text('รถ 4 ล้อ, จัดส่งจังหวัดปลายทางกรุงเทพ'), // Example detail line
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        // --- Tag สถานะ ---
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: isOnHold ? Colors.red.shade600 : Colors.green.shade600,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            isOnHold ? "Hold" : "Ready",
-                                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        // --- ปุ่ม View ---
-                                        OutlinedButton(
-                                          onPressed: () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (context) => ShipmentDetailScreen(
-                                                  shipId: shipment.shipid,
-                                                  accessToken: widget.accessToken,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: const Text("View"),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+  itemCount: _unassignedShipments.length,
+  itemBuilder: (context, index) {
+    final shipment = _unassignedShipments[index];
+    final bool isOnHold = shipment.isOnHold;
+    
+    return Card(
+      color: isOnHold ? Colors.grey.shade200 : Colors.blue.shade50,
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
+          children: [
+            Icon(Icons.local_shipping_outlined, color: Colors.grey.shade700, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if(shipment.shippoint == '1001')
+                  const Text('คลัง: WH7', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  if(shipment.shippoint == '1000')
+                  const Text('คลัง: SW', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  Text('Shipment ${shipment.shipid}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
+                  Text(shipment.mshiptype?.cartypedes ?? 'ประเภทรถไม่ระบุ'),
+                  Text('จัดส่งจังหวัดปลาย : ${shipment.details.isNotEmpty ? shipment.details.first.routedes : 'N/A'}'),
+                ],
+              ),
             ),
+            const SizedBox(width: 12),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // --- Tag สถานะ ---
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isOnHold ? Colors.red.shade600 : Colors.green.shade600,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isOnHold ? "Hold" : "Ready",
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // --- ปุ่ม View ---
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ShipmentDetailScreen(
+                          shipId: shipment.shipid,
+                          accessToken: widget.accessToken,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("View"),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  },
+)
+),
           ],
         ),
       );

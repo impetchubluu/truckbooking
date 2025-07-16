@@ -170,14 +170,16 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
           children: [
             Text('Shipment ${shipment.shipid}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            // TODO: ใช้ apmdate จริงจาก shipment object
             Text('Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
-            Text('คลัง : ${shipment.provname ?? 'N/A'}'), //provname ควรจะมาจาก shippoint หรือมีข้อมูลแยก
+             if(shipment.shippoint == '1001')
+                  const Text('คลัง: WH7'),
+            if(shipment.shippoint == '1000')
+                  const Text('คลัง: SW'),
             Row(
               children: [
                 Icon(Icons.local_shipping_outlined, size: 16, color: Colors.grey.shade700),
                 const SizedBox(width: 4),
-                Text('${shipment.shiptypeDesc ?? 'N/A'}, จัดส่งจังหวัดปลายทางกรุงเทพ'), // provname ควรจะมาจากจังหวัดปลายทาง
+                Text(shipment.mshiptype?.cartypedes ?? 'ประเภทรถไม่ระบุ'), // provname ควรจะมาจากจังหวัดปลายทาง
               ],
             )
           ],

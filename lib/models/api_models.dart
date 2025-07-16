@@ -1,3 +1,5 @@
+// ignore_for_file: non_constant_identifier_names
+
 import 'package:flutter/material.dart';
 
 // --- Car Model ---
@@ -28,8 +30,32 @@ class CarProfile {
       stat: json['stat'] ?? 'N/A Stat',
     );
   }
+  Map<String, dynamic> toJson() {
+    return {
+      'carlicense': carlicense,
+      'conid': conid,
+      'cartype': cartype,
+      'cartypedes': cartypedes,
+      'remark': remark,
+      'stat': stat,
+    };
+  }
+  
 }
 
+class ShipType {
+  final String cartype;
+  final String cartypedes;
+
+  ShipType({required this.cartype, required this.cartypedes});
+
+  factory ShipType.fromJson(Map<String, dynamic> json) {
+    return ShipType(
+      cartype: json['cartype'] ?? 'N/A',
+      cartypedes: json['cartypedes'] ?? 'Unknown Type',
+    );
+  }
+}
 // --- User Profile Model ---
 class UserProfile {
   final int id;
@@ -52,8 +78,7 @@ class UserProfile {
     this.cars = const [],
   });
 
-  
-
+  // ฟังก์ชัน fromJson เพื่อแปลงข้อมูลจาก JSON
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     var carListFromJson = json['cars'] as List?;
     List<CarProfile> carsList = carListFromJson?.map((carJson) => CarProfile.fromJson(carJson as Map<String, dynamic>)).toList() ?? [];
@@ -68,7 +93,22 @@ class UserProfile {
       cars: carsList,
     );
   }
+
+  // ฟังก์ชัน toJson เพื่อแปลง UserProfile กลับเป็น JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'role': role,
+      'display_name': displayName,
+      'is_active': isActive,
+      'vencode': vencode,
+      'grade': grade,
+      'cars': cars.map((car) => car.toJson()).toList(),
+    };
+  }
 }
+
 
 // --- Warehouse Model ---
 class Warehouse {
@@ -90,25 +130,33 @@ class Shipment {
   final String shipid;
   final String? customerName;
   final String? provname;
-  final String? shiptypeDesc; // คำอธิบายประเภทรถ
+  final String? shippoint;
+  final String? cartype; // ประเภทรถ
+  final String? cartypeDesc; // คำอธิบายประเภทรถ
   final int? quantity; // จำนวนรวม (อาจจะมาจากผลรวมของ details)
   final double? volumeCbm; // ปริมาตรรวม (อาจจะมาจากผลรวมของ details)
   bool isOnHold;
   final String? docstat;
   final List<ShipmentDetail> details; 
-  final String? current_grade_to_assign; // เกรดที่ต้องการส่งไปยังผู้ขาย
+  final String? current_grade_to_assign;
+  final Warehouse? warehouse;
+  final ShipType? mshiptype;
 
   Shipment({
     required this.shipid,
     this.customerName,
     this.provname,
-    this.shiptypeDesc,
+    this.cartype,
+    this.cartypeDesc,
     this.quantity,
     this.volumeCbm,
     this.isOnHold = false,
     this.docstat,
     this.details = const [], 
     this.current_grade_to_assign,
+    this.shippoint,
+    this.warehouse,
+    this.mshiptype,
   });
 
   factory Shipment.fromJson(Map<String, dynamic> json) {
@@ -119,15 +167,20 @@ class Shipment {
 
     return Shipment(
       shipid: json['shipid'] ?? 'N/A ShipID',
+      shippoint: json['shippoint'], 
       customerName: json['customer_name'],
       provname: json['provname'],
-      shiptypeDesc: json['shiptype_desc'],
+      cartype: json['cartype'],
+      cartypeDesc: json['cartypeDesc'],
       quantity: json['quantity'],
       volumeCbm: json['volume_cbm'] != null ? double.tryParse(json['volume_cbm'].toString()) : null,
       isOnHold: json['is_on_hold'] ?? false,
       docstat: json['docstat'],
       details: parsedDetails,
       current_grade_to_assign: json['current_grade_to_assign'],
+      mshiptype: json['mshiptype'] != null
+               ? ShipType.fromJson(json['mshiptype'])
+               : null,
     );
   }
 }
@@ -135,18 +188,19 @@ class Shipment {
 class BookingRound {
   final int id;
   final String name;
-  final TimeOfDay time;
+  final TimeOfDay? time;
   final List<Shipment> shipments;
 
   BookingRound({
     required this.id,
     required this.name,
-    required this.time,
+    this.time,
     this.shipments = const [],
   });
 
   factory BookingRound.fromJson(Map<String, dynamic> json) {
-    TimeOfDay parsedTime = TimeOfDay.now();
+    TimeOfDay? parsedTime; 
+    parsedTime = TimeOfDay.now();
     if (json['round_time'] != null && json['round_time'] is String) {
       final parts = json['round_time'].split(':');
       if (parts.length >= 2) {
@@ -202,6 +256,26 @@ class ShipmentDetail {
       province: json['province'] ?? 'N/A',
       // แปลงค่าที่อาจจะเป็น int หรือ double ให้เป็น double
       volumn: (json['volumn'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+class MasterBookingRound {
+  final TimeOfDay time;
+  final String? name;
+
+  MasterBookingRound({required this.time, this.name});
+
+  factory MasterBookingRound.fromJson(Map<String, dynamic> json) {
+    TimeOfDay parsedTime = TimeOfDay.now();
+    if (json['round_time'] != null && json['round_time'] is String) {
+      final parts = json['round_time'].split(':');
+      if (parts.length >= 2) {
+        parsedTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+    }
+    return MasterBookingRound(
+      time: parsedTime,
+      name: json['round_name'],
     );
   }
 }
