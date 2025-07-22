@@ -159,6 +159,96 @@ class ApiService {
     }
     throw Exception(result['error']);
   }
+  Future<void> confirmShipment(String token, String shipId, String carLicense, String? carNote) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/shipments/confirm');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'shipid': shipId,
+        'carlicense': carLicense,
+        'carnote': carNote,
+      }),
+    );
+    // ใช้ _handleResponse ที่คุณอาจจะมีอยู่แล้วเพื่อจัดการ Error
+    await _handleResponse(response); 
+  }
+
+  Future<void> rejectShipment(String token, String shipId, String reason) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/shipments/reject');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'shipid': shipId,
+        'rejection_reason': reason,
+      }),
+    );
+    await _handleResponse(response);
+  }
+Future<List<Shipment>> getMyOngoingOrders(String token) async {
+    // API Endpoint: /api/v1/shipments/my-orders
+    final uri = Uri.parse('$_baseUrl/api/v1/shipments/my-orders');
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    // ใช้ _handleResponse (ถ้ามี) หรือจัดการเอง
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Shipment.fromJson(json)).toList();
+    } else {
+      // จัดการ Error
+      throw Exception('Failed to load ongoing orders: ${response.body}');
+    }
+  }
+Future<List<VendorProfile>> getAllVendorProfiles(String token) async {
+  final uri = Uri.parse('$_baseUrl/api/v1/users/vendors/all'); // Path ต้องตรงกับ Endpoint ที่สร้าง
+  final response = await http.get(
+    uri,
+    headers: {'Authorization': 'Bearer $token'},
+  );
+
+  if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((json) => VendorProfile.fromJson(json)).toList();
+  } else {
+    throw Exception('Failed to load vendor profiles');
+  }
+}
+  // --- เพิ่มฟังก์ชันนี้สำหรับดึง "ประวัติงาน" (History) ---
+  Future<List<Shipment>> getMyHistory(String token, {Map<String, String>? filters}) async {
+    // API Endpoint: /api/v1/shipments/my-history
+    var uri = Uri.parse('$_baseUrl/api/v1/shipments/my-history');
+  
+  // เพิ่ม query parameters ถ้ามี filters ส่งเข้ามา
+  if (filters != null && filters.isNotEmpty) {
+    // กรองเอาเฉพาะ filter ที่มีค่า ไม่ใช่ค่าว่าง
+    final activeFilters = Map.from(filters)..removeWhere((key, value) => value.isEmpty);
+    if (activeFilters.isNotEmpty) {
+      uri = uri.replace(queryParameters: Map<String, String>.from(activeFilters));
+    }
+  }
+
+  final response = await http.get(
+    uri,
+    headers: {'Authorization': 'Bearer $token'},
+  );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Shipment.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load history: ${response.body}');
+    }
+  }
 
   Future<bool> saveDayRounds(String token, SaveDayRoundsRequestData data) async {
      final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/save-for-day');

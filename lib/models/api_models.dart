@@ -1,5 +1,7 @@
 // ignore_for_file: non_constant_identifier_names
 
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 
 // --- Car Model ---
@@ -42,7 +44,36 @@ class CarProfile {
   }
   
 }
+class VendorProfile {
+  final String vencode;
+  final String venname;
+  final String grade;
+  final List<CarProfile> cars;
 
+  VendorProfile({
+    required this.vencode,
+    required this.venname,
+    required this.grade,
+    this.cars = const [], // ให้ค่า default เป็น List ว่าง
+  });
+
+  factory VendorProfile.fromJson(Map<String, dynamic> json) {
+    // ดึงข้อมูล list ของรถออกมา
+    var carListFromJson = json['cars'] as List? ?? []; // ป้องกันกรณี cars เป็น null
+    
+    // แปลง list ของ JSON object ให้เป็น List ของ CarProfile object
+    List<CarProfile> parsedCars = carListFromJson
+        .map((carJson) => CarProfile.fromJson(carJson as Map<String, dynamic>))
+        .toList();
+
+    return VendorProfile(
+      vencode: json['vencode'] ?? 'N/A',
+      venname: json['venname'] ?? 'Unknown Vendor',
+      grade: json['grade'] ?? 'N/A',
+      cars: parsedCars,
+    );
+  }
+}
 class ShipType {
   final String cartype;
   final String cartypedes;
@@ -124,39 +155,97 @@ class Warehouse {
     );
   }
 }
+class MLeadTime {
+  final String route;
+  final String provth;
+  final String? routedes;
+  final String? proven;
+  final String? zone;
+  final String? zonedes;
+  final double leadTime;
 
+  MLeadTime({
+    required this.route,
+    required this.provth,
+    this.routedes,
+    this.proven,
+    this.zone,
+    this.zonedes,
+    required this.leadTime,
+  });
+
+  factory MLeadTime.fromJson(Map<String, dynamic> json) {
+    return MLeadTime(
+      route: json['route'] ?? '',
+      provth: json['provth'] ?? '',
+      routedes: json['routedes'],
+      proven: json['proven'],
+      zone: json['zone'],
+      zonedes: json['zonedes'],
+      leadTime: json['leadtime'] ?? 0, 
+    );
+  }
+}
+class MProvince {
+  final int province;
+  final String provname;
+
+  MProvince({required this.province, required this.provname});
+
+  factory MProvince.fromJson(Map<String, dynamic> json) {
+    return MProvince(
+      province: json['province'] ?? 0,
+      provname: json['provname'] ?? 'N/A',
+    );
+  }
+}
 // --- Shipment Model ---
 class Shipment {
   final String shipid;
   final String? customerName;
-  final String? provname;
+  final int? province;
+  final MProvince? mprovince;
   final String? shippoint;
-  final String? cartype; // ประเภทรถ
+  final String? cartype;
+  final String? vencode;
+  final String? carlicense; // ประเภทรถ
   final String? cartypeDesc; // คำอธิบายประเภทรถ
   final int? quantity; // จำนวนรวม (อาจจะมาจากผลรวมของ details)
   final double? volumeCbm; // ปริมาตรรวม (อาจจะมาจากผลรวมของ details)
   bool isOnHold;
   final String? docstat;
+  final String? route;
+  final MLeadTime? mLeadTime;
   final List<ShipmentDetail> details; 
   final String? current_grade_to_assign;
   final Warehouse? warehouse;
   final ShipType? mshiptype;
-
+  final DateTime? assigned_at;
+  final DateTime? apmdate;
+  final DateTime? chdate; 
   Shipment({
     required this.shipid,
     this.customerName,
-    this.provname,
+    this.province,
+    this.mprovince,
     this.cartype,
+    this.vencode,
+    this.carlicense,
     this.cartypeDesc,
     this.quantity,
     this.volumeCbm,
     this.isOnHold = false,
     this.docstat,
+    this.route,
+    this.mLeadTime,
     this.details = const [], 
     this.current_grade_to_assign,
     this.shippoint,
     this.warehouse,
     this.mshiptype,
+    this.assigned_at,
+    this.apmdate, // วันที่นัดรับ
+    this.chdate, // วันที่เปลี่ยนแปลงสถานะ
   });
 
   factory Shipment.fromJson(Map<String, dynamic> json) {
@@ -164,24 +253,48 @@ class Shipment {
     List<ShipmentDetail> parsedDetails = detailListFromJson
         .map((d) => ShipmentDetail.fromJson(d as Map<String, dynamic>))
         .toList();
-
+    final String? assignedAtString = json['assigned_at'];
+  DateTime? assignedAtUtc;
+   if (assignedAtString != null) {
+    // --- จุดแก้ไขสำคัญ ---
+    // ต่อท้ายด้วย 'Z' เพื่อบอกให้ Dart รู้ว่านี่คือเวลา UTC
+    assignedAtUtc = DateTime.parse('${assignedAtString}Z'); 
+  }
     return Shipment(
       shipid: json['shipid'] ?? 'N/A ShipID',
       shippoint: json['shippoint'], 
       customerName: json['customer_name'],
-      provname: json['provname'],
+      province: json['province'],
+      mprovince: json['mprovince'] != null
+               ? MProvince.fromJson(json['mprovince'])
+               : null,
       cartype: json['cartype'],
+      vencode: json['vencode'],
+      carlicense: json['carlicense'],
       cartypeDesc: json['cartypeDesc'],
       quantity: json['quantity'],
       volumeCbm: json['volume_cbm'] != null ? double.tryParse(json['volume_cbm'].toString()) : null,
       isOnHold: json['is_on_hold'] ?? false,
       docstat: json['docstat'],
+      route: json['route'],
+       mLeadTime: json['mleadtime'] != null
+               ? MLeadTime.fromJson(json['mleadtime'])
+               : null,
       details: parsedDetails,
       current_grade_to_assign: json['current_grade_to_assign'],
       mshiptype: json['mshiptype'] != null
                ? ShipType.fromJson(json['mshiptype'])
                : null,
+      assigned_at:assignedAtUtc,
+      apmdate: json['apmdate'] != null
+          ? DateTime.tryParse(json['apmdate'])
+          : null, // แปลงวันที่นัดรับเป็น DateTime
+          
+      chdate: json['chdate'] != null
+          ? DateTime.tryParse(json['chdate'])
+          : null, // แปลงวันที่เปลี่ยนแปลงสถานะเป็น DateTime
     );
+
   }
 }
 // --- Booking Round Model ---

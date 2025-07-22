@@ -179,7 +179,7 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
               children: [
                 Icon(Icons.local_shipping_outlined, size: 16, color: Colors.grey.shade700),
                 const SizedBox(width: 4),
-                Text(shipment.mshiptype?.cartypedes ?? 'ประเภทรถไม่ระบุ'), // provname ควรจะมาจากจังหวัดปลายทาง
+                Text(shipment.mshiptype?.cartypedes ?? 'ประเภทรถไม่ระบุ'), 
               ],
             )
           ],

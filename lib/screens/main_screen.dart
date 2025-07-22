@@ -25,7 +25,9 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     Future.microtask(() => _buildUIForRole());
   }
-
+    void _handleLogout() {
+    Provider.of<AuthProvider>(context, listen: false).logout();
+  }
   void _buildUIForRole() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isAuthenticated || authProvider.userProfile == null) {
@@ -34,16 +36,15 @@ class _MainScreenState extends State<MainScreen> {
     }
     final userRole = authProvider.userProfile!.role;
     final token = authProvider.token!;
-    final username = authProvider.userProfile!.username;
 
     if (userRole == 'dispatcher' || userRole == 'admin') {
       setState(() {
-        _appBarTitles = ['จัดเตรียมการจอง', 'รายการที่จองแล้ว', 'ประวัติ', 'ข้อมูลส่วนตัว'];
+        _appBarTitles = ['จัดเตรียมการจอง', 'รายการที่จองแล้ว', 'ประวัติ', 'ขนส่งของฉัน'];
         _pages = [
           DispatcherHomeScreen(accessToken: token),
           const BookedScreen(),
           const HistoryScreen(),
-          InfoScreen(accessToken: token, initialUsername: username),
+          const InfoScreen(),
         ];
         _navBarItems = const [
           BottomNavigationBarItem(icon: Icon(Icons.home_work_rounded), label: 'Home'),
@@ -59,7 +60,7 @@ class _MainScreenState extends State<MainScreen> {
           const VendorHomeScreen(),
           const BookedScreen(),
           const HistoryScreen(),
-          InfoScreen(accessToken: token, initialUsername: username),
+          const InfoScreen(),
         ];
         _navBarItems = const [
           BottomNavigationBarItem(icon: Icon(Icons.new_releases_rounded), label: 'New Jobs'),
@@ -88,8 +89,10 @@ class _MainScreenState extends State<MainScreen> {
         title: Text(_appBarTitles.isNotEmpty ? _appBarTitles[_selectedIndex] : 'Loading...'),
         actions: [
           IconButton(
-            icon: const Badge(label: Text('1'), child: Icon(Icons.notifications_none_rounded)),
-            onPressed: () {},
+            icon:  const Icon(Icons.logout),
+            onPressed: () {
+              _handleLogout();
+            },
           )
         ],
       ),

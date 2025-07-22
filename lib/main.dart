@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:truck_booking_app/providers/user_profile_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
@@ -22,9 +23,13 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   await NotificationService().initialize();
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => AuthProvider(),
+   runApp(
+    // เปลี่ยน ChangeNotifierProvider เป็น MultiProvider
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProvider(create: (context) => UserProfileProvider()), // <-- เพิ่ม Provider ใหม่
+      ],
       child: const MyApp(),
     ),
   );
