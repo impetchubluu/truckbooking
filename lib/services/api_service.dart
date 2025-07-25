@@ -56,13 +56,13 @@ class ApiService {
     final dateString = DateFormat('yyyy-MM-dd').format(date);
     Uri uri;
     if (shippoint == 'SW') {
-      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=1000');
+      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?crdate=$dateString&shippoint=1000');
     }
     else if (shippoint == 'WH7') {
-      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=1001');
+      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?crdate=$dateString&shippoint=1001');
     } else {
       // ถ้า shippoint ไม่ใช่ SW หรือ NW ให้ใช้ค่าเริ่มต้น
-      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?apmdate=$dateString&shippoint=$shippoint');
+      uri = Uri.parse('$_baseUrl/api/v1/shipments/unassigned?crdate=$dateString&shippoint=$shippoint');
     }
     final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
     final result = await _handleResponse(response);
@@ -72,7 +72,41 @@ class ApiService {
     }
     throw Exception(result['error']);
   }
+Future<BookingRound> assignAllToRound(
+    String token,
+    int roundId,
+    DateTime selectedDate,
+    String warehouseCode,
+  ) async {
+    // สร้าง formatter เพื่อแปลง DateTime เป็น String ในรูปแบบ 'YYYY-MM-DD'
+    final DateFormat formatter = DateFormat('yyyy-MM-dd');
+    final String formattedDate = formatter.format(selectedDate);
 
+    // สร้าง URI พร้อมกับ Query Parameters
+    final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/$roundId/assign-all')
+        .replace(queryParameters: {
+      'crdate': formattedDate,
+      'shippoint': warehouseCode,
+    });
+
+    print('Calling API: $uri'); // สำหรับ Debug
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    final result = await _handleResponse(response);
+    if (result['success']) {
+      // API นี้จะคืนค่า BookingRound ที่อัปเดตแล้วกลับมา
+      return BookingRound.fromJson(result['data']);
+    } else {
+      throw Exception(result['error']);
+    }
+  }
   Future<Shipment> holdShipment(String token, String shipId, bool hold) async {
     final uri = Uri.parse('$_baseUrl/api/v1/shipments/$shipId/hold');
     final response = await http.post(
@@ -148,6 +182,25 @@ class ApiService {
       throw Exception(result['error']);
     }
   }
+  Future<BookingRound> getBookingRoundDetails(String token, int roundId) async {
+  final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/$roundId'); // <-- Backend ต้องมี Endpoint นี้
+  final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+  final result = await _handleResponse(response);
+  if (result['success']) {
+    return BookingRound.fromJson(result['data']);
+  }
+  throw Exception(result['error']);
+}
+
+// 2. เริ่มการจัดสรรงาน
+Future<void> allocateRound(String token, int roundId) async {
+  final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/$roundId/allocate'); // <-- Backend ต้องมี Endpoint นี้
+  final response = await http.post(uri, headers: {'Authorization': 'Bearer $token'});
+  final result = await _handleResponse(response);
+  if (!result['success']) {
+    throw Exception(result['error']);
+  }
+}
     Future<List<MasterBookingRound>> getMasterBookingRounds(String token) async {
     final uri = Uri.parse('$_baseUrl/api/v1/master/booking-rounds');
     final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
@@ -176,7 +229,27 @@ class ApiService {
     // ใช้ _handleResponse ที่คุณอาจจะมีอยู่แล้วเพื่อจัดการ Error
     await _handleResponse(response); 
   }
+  Future<List<BookingRound>> getRoundsPendingConfirmation(String token) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/pending-confirmation');
+    final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+    final result = await _handleResponse(response);
+    if (result['success']) {
+      final List<dynamic> data = result['data'] ?? [];
+      return data.map((json) => BookingRound.fromJson(json)).toList();
+    }
+    throw Exception(result['error']);
+  }
 
+  // --- เพิ่มฟังก์ชันนี้เข้าไป ---
+  Future<BookingRound> confirmRoundAssignments(String token, int roundId) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/booking-rounds/$roundId/confirm-assignment');
+    final response = await http.post(uri, headers: {'Authorization': 'Bearer $token'});
+    final result = await _handleResponse(response);
+    if (result['success']) {
+      return BookingRound.fromJson(result['data']);
+    }
+    throw Exception(result['error']);
+  }
   Future<void> rejectShipment(String token, String shipId, String reason) async {
     final uri = Uri.parse('$_baseUrl/api/v1/shipments/reject');
     final response = await http.post(

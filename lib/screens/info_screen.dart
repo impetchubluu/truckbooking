@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
 import 'package:provider/provider.dart';
@@ -120,20 +121,15 @@ class _InfoScreenState extends State<InfoScreen> {
     // ไม่ต้องมี setState ที่นี่ เพราะจะถูกเรียกใช้ใน context ที่มี setState อยู่แล้ว
   }
 
-  void _handleLogout() {
-    Provider.of<AuthProvider>(context, listen: false).logout();
-  }
 
   @override
   Widget build(BuildContext context) {
     // ดึงข้อมูลจาก Provider เพื่อใช้ใน UI
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userRole = authProvider.userProfile?.role;
-    final displayName = authProvider.userProfile?.displayName ?? authProvider.userProfile?.username ?? 'User';
     
     return Scaffold(
-      // AppBar จะถูกจัดการโดย MainScreen.dart อยู่แล้ว จึงไม่จำเป็นต้องมีที่นี่
-      // แต่ถ้าหน้านี้เป็นหน้าเดี่ยวๆ ก็ใส่ AppBar ไว้ได้
+
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -308,19 +304,26 @@ class _InfoScreenState extends State<InfoScreen> {
       itemCount: _filteredCarsForVendor.length,
       itemBuilder: (context, index) {
         final car = _filteredCarsForVendor[index];
-        return Card(
-          elevation: 1,
-          margin: const EdgeInsets.symmetric(vertical: 4.0),
-          child: ListTile(
-            leading: Icon(
-              Icons.directions_car_filled_outlined,
-              color: car.stat == "ใช้งาน" ? Theme.of(context).colorScheme.secondary : Colors.grey.shade500,
-            ),
-            title: Text(car.carlicense, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(car.cartypedes ?? 'N/A Type'),
-            trailing: Text(car.stat, style: TextStyle(color: car.stat == 'ใช้งาน' ? Colors.green : Colors.red)),
+        // เช็คว่า car มีค่า will_be_available_at หรือไม่
+      final willBeAvailableAt = car.will_be_available_at != null
+          ? DateFormat('dd/MM/yyyy').format(car.will_be_available_at!)
+          : 'N/A';  // ถ้าไม่มี จะโชว์เป็น 'N/A' 
+         return Card(
+        elevation: 1,
+        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        child: ListTile(
+          leading: Icon(
+            Icons.directions_car_filled_outlined,
+            color: car.stat == "ใช้งาน" ? Theme.of(context).colorScheme.secondary : Colors.grey.shade500,
           ),
-        );
+          title: Text(car.carlicense, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text('${car.cartypedes ?? 'N/A Type'}\nWill be available at: $willBeAvailableAt'),
+          trailing: Text(
+            car.stat,
+            style: TextStyle(color: car.stat == 'ใช้งาน' ? Colors.green : Colors.red),
+          ),
+        ),
+      );
       },
     );
   }

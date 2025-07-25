@@ -249,10 +249,11 @@ Widget _buildFilterPanel() {
     leading: Icon(Icons.check_circle_outline, color: statusInfo.$2),
     title: Text('Shipment ${shipment.shipid}'),
     subtitle: Text(
-      'Vendor: ${shipment.vencode}\n'
+      'ขนส่ง: ${shipment.vencode}\n'
+      'ประเภทรถ: ${shipment.mshiptype?.cartypedes ?? 'ไม่ระบุ'}\n'
       'Route: ${shipment.route ?? 'N/A'}\n'
-      'Finished: ${DateFormat('dd MMM yyyy').format(shipment.chdate!)}\n'
-      'ต้องเข้ารับสินค้า: ${shipment.apmdate != null ? DateFormat('dd MMM yyyy HH:mm')  .format(shipment.apmdate!) : 'N/A'}',
+      'วันที่นัดรถ: ${DateFormat('dd/MM/yyyy').format(shipment.apmdate!)}\n'
+      'เวลา: ${shipment.apmdate != null ? DateFormat('HH:mm')  .format(shipment.apmdate!) : 'N/A'}',
     ),
     isThreeLine: true,
     trailing: Text(

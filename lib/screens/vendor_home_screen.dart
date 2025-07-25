@@ -512,11 +512,10 @@ Widget _buildJobCard(Shipment shipment) {
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
             ),
             Text(
-              'ประเภทรถ: ${shipment.cartype ?? 'N/A'}',
+              'ประเภทรถ: ${shipment.mshiptype?.cartypedes ?? 'N/A'}',
               style: theme.textTheme.bodyMedium,
             ),
             const Divider(height: 20),
-            _buildInfoRow(Icons.person_outline, 'ลูกค้า:', shipment.customerName ?? 'N/A'),
             _buildInfoRow(Icons.location_on_outlined, 'จังหวัด:', shipment.mprovince?.provname ?? 'N/A'),
             const SizedBox(height: 12),
             

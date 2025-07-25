@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:truck_booking_app/screens/manage_round_screen.dart';
+import 'package:truck_booking_app/screens/round_detail_screen.dart';
 import 'package:truck_booking_app/screens/shipment_detail_screen.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
@@ -12,9 +13,6 @@ import '../models/api_models.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
-// TODO: สร้างหน้าจอเหล่านี้ในอนาคต
-// import 'round_detail_screen.dart';
-// import 'manage_round_screen.dart';
 
 class DispatcherHomeScreen extends StatefulWidget {
   final String accessToken;
@@ -35,7 +33,8 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
   List<Warehouse> _warehouses = [];
   List<BookingRound> _bookingRounds = [];
   List<Shipment> _unassignedShipments = [];
-
+  bool _showUnassignedShipments = false; 
+  
   @override
   void initState() {
     super.initState();
@@ -196,12 +195,14 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                     child: Text('${wh.code} (${wh.name})'),
                   );
                 }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null && newValue != _selectedWarehouseCode) {
-                    setState(() { _selectedWarehouseCode = newValue; });
-                    _fetchDataForSelectedFilters();
-                  }
-                },
+                 onChanged: (String? newValue) {
+                if (newValue != null && newValue != _selectedWarehouseCode) {
+                  setState(() {
+                    _selectedWarehouseCode = newValue; // <-- จะ set ค่าเป็น '1000'
+                  });
+                  _fetchDataForSelectedFilters(); // <-- ฟังก์ชันนี้จะใช้ _selectedWarehouseCode ที่เป็น '1000' ไปเรียก API
+                }
+              },
               ),
             ),
           ),
@@ -258,47 +259,141 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
     );
   }
 
-  Widget _buildRoundItem(BookingRound round) {
-    return ListTile(
-      dense: true,
-      title: Text(round.name),
-      subtitle: Text("เวลา: ${round.time?.format(context)}, จำนวน ${round.shipments.length} รายการ"),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+ Widget _buildRoundItem(BookingRound round) {
+   final timeFormatter = DateFormat('h:mm a'); 
+  String formattedTime = 'N/A';
+  if (round.time != null) {
+    // แปลง TimeOfDay เป็น DateTime ชั่วคราวเพื่อใช้ formatter
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, round.time!.hour, round.time!.minute);
+    formattedTime = timeFormatter.format(dt);
+  }
+  return ListTile(
+    dense: true,
+    title: Text(round.name),
+    subtitle: Text("เวลา: $formattedTime, จำนวน ${round.shipments.length} รายการ"), // <-- length จะถูกต้องแล้ว
+    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+    onTap: () {
+      // --- แก้ไขตรงนี้ ---
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => RoundDetailScreen(
+            roundId: round.id,
+            roundName: round.name,
+            roundTime: round.time,
+            accessToken: widget.accessToken,
+            selectedDate: _selectedDate,
+            warehouseCode: _selectedWarehouseCode!,
+          ),
+        ),
+      ).then((_) {
+        // .then() จะทำงานเมื่อ pop กลับมาจาก RoundDetailScreen
+        // ให้ refresh หน้า Home เพื่ออัปเดตข้อมูลล่าสุด
+        _fetchDataForSelectedFilters();
+      });
+      // --------------------
+    },
+  );
+}
+Widget _buildShipmentsSection() {
+  return Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // --- ส่วนหัวยังคงเหมือนเดิม ---
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(left: 4.0),
+              child: Text("รายการ Shipments ทั้งหมด", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            // --- ปุ่ม View/Hide ---
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _showUnassignedShipments = !_showUnassignedShipments;
+                });
+              },
+              child: Row(
+                children: [
+                  Text(_showUnassignedShipments ? "Hide" : "View"),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _showUnassignedShipments ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8.0),
+
+        // --- ส่วนเนื้อหาที่จะแสดง/ซ่อน ---
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _showUnassignedShipments
+                      ? _buildShipmentsListView() // <-- ถ้า true, แสดง ListView
+                      : _buildPlaceholderCard(), // <-- ถ้า false, แสดง Card ว่างๆ
+                ),
+        ),
+      ],
+    ),
+  );
+}
+Widget _buildPlaceholderCard() {
+  // Widget ที่จะแสดงตอนที่ List ถูกซ่อน
+  return Card(
+    key: const ValueKey('placeholder'), // Key สำหรับ AnimatedSwitcher
+    child: InkWell(
       onTap: () {
-        // TODO: Navigate to RoundDetailScreen(roundId: round.id)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Navigate to detail for ${round.name}')));
+        setState(() {
+          _showUnassignedShipments = true;
+        });
       },
+      child: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.visibility_off_outlined, color: Colors.grey, size: 40),
+              SizedBox(height: 8),
+              Text("กด 'View' เพื่อแสดงรายการ", style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+Widget _buildShipmentsListView() {
+  // ยก Logic การสร้าง ListView มาไว้ที่นี่
+  if (_unassignedShipments.isEmpty) {
+    return const Card(
+      key: ValueKey('emptyList'), // Key สำหรับ AnimatedSwitcher
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text("ไม่มี Shipment ที่รอจัดสรร", style: TextStyle(color: Colors.grey)),
+        ),
+      ),
     );
   }
 
- Widget _buildShipmentsSection() {
-      return Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 4.0, bottom: 8.0),
-              child: Text("รายการ Shipments ทั้งหมด", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _unassignedShipments.isEmpty
-                      ? const Card(
-                          child: Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Text("ไม่มี Shipment ที่รอจัดสรร", style: TextStyle(color: Colors.grey)),
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-  itemCount: _unassignedShipments.length,
-  itemBuilder: (context, index) {
-    final shipment = _unassignedShipments[index];
-    final bool isOnHold = shipment.isOnHold;
-    
-    return Card(
+  return ListView.builder(
+    key: const ValueKey('shipmentsList'), // Key สำหรับ AnimatedSwitcher
+    itemCount: _unassignedShipments.length,
+    itemBuilder: (context, index) {
+      final shipment = _unassignedShipments[index];
+      final bool isOnHold = shipment.isOnHold;
+      
+      // ... โค้ด Card ของคุณ (เหมือนเดิมเป๊ะๆ ไม่ต้องแก้) ...
+      return Card(
       color: isOnHold ? Colors.grey.shade200 : Colors.blue.shade50,
       margin: const EdgeInsets.symmetric(vertical: 5),
       elevation: 1,
@@ -317,9 +412,9 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                   if(shipment.shippoint == '1000')
                   const Text('คลัง: SW', style: TextStyle(fontSize: 14, color: Colors.grey)),
                   Text('Shipment ${shipment.shipid}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text('Date: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
-                  Text(shipment.mshiptype?.cartypedes ?? 'ประเภทรถไม่ระบุ'),
-                  Text('จัดส่งจังหวัดปลาย : ${shipment.details.isNotEmpty ? shipment.details.first.routedes : 'N/A'}'),
+                  Text('วันที่นัดรถ: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
+                  Text('ประเภท: ${shipment.mshiptype?.cartypedes ?? 'ประเภทรถไม่ระบุ'}'),
+                  Text('Route: ${shipment.route ?? 'N/A'}${shipment.details.isNotEmpty ? shipment.details.first.routedes : 'N/A'}'),
                 ],
               ),
             ),
@@ -361,11 +456,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
         ),
       ),
     );
-  },
-)
-),
-          ],
-        ),
-      );
-    }
-    }
+    },
+  );
+}
+}

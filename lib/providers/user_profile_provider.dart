@@ -43,4 +43,11 @@ Future<void> fetchUserProfile(String token) async {
       notifyListeners();
     }
   }
+   void clear() {
+    _userProfile = null;
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+    print("UserProfileProvider cleared!"); // สำหรับ Debug
+  }
 }

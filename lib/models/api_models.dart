@@ -12,7 +12,7 @@ class CarProfile {
   final String? cartypedes;
   final String? remark;
   final String stat;
-
+  final DateTime? will_be_available_at; // วันที่จะพร้อมใช้งาน
   CarProfile({
     required this.carlicense,
     this.conid,
@@ -20,6 +20,7 @@ class CarProfile {
     this.cartypedes,
     this.remark,
     required this.stat,
+    this.will_be_available_at, // วันที่จะพร้อมใช้งาน
   });
 
   factory CarProfile.fromJson(Map<String, dynamic> json) {
@@ -30,6 +31,9 @@ class CarProfile {
       cartypedes: json['cartypedes'],
       remark: json['remark'],
       stat: json['stat'] ?? 'N/A Stat',
+      will_be_available_at: json['will_be_available_at'] != null
+          ? DateTime.tryParse(json['will_be_available_at'])
+          : null, // แปลงวันที่จะพร้อมใช้งานเป็น DateTime ถ้าไม่เป็น null
     );
   }
   Map<String, dynamic> toJson() {
@@ -199,6 +203,26 @@ class MProvince {
     );
   }
 }
+class MVendor {
+  final String vencode;
+  final String venname;
+  final String grade;
+  // คุณสามารถเพิ่ม field อื่นๆ ของ vendor ได้ตามต้องการ
+
+  MVendor({
+    required this.vencode,
+    required this.venname,
+    required this.grade,
+  });
+
+  factory MVendor.fromJson(Map<String, dynamic> json) {
+    return MVendor(
+      vencode: json['vencode'] ?? 'N/A',
+      venname: json['venname'] ?? 'Unknown Vendor',
+      grade: json['grade'] ?? 'N/A',
+    );
+  }
+}
 // --- Shipment Model ---
 class Shipment {
   final String shipid;
@@ -223,6 +247,8 @@ class Shipment {
   final DateTime? assigned_at;
   final DateTime? apmdate;
   final DateTime? chdate; 
+  final DateTime? crdate; 
+  final MVendor? mvendor;
   Shipment({
     required this.shipid,
     this.customerName,
@@ -245,7 +271,9 @@ class Shipment {
     this.mshiptype,
     this.assigned_at,
     this.apmdate, // วันที่นัดรับ
-    this.chdate, // วันที่เปลี่ยนแปลงสถานะ
+    this.chdate,
+    this.crdate,
+    this.mvendor,
   });
 
   factory Shipment.fromJson(Map<String, dynamic> json) {
@@ -293,7 +321,14 @@ class Shipment {
       chdate: json['chdate'] != null
           ? DateTime.tryParse(json['chdate'])
           : null, // แปลงวันที่เปลี่ยนแปลงสถานะเป็น DateTime
+      crdate: json['crdate'] != null
+          ? DateTime.tryParse(json['crdate'])
+          : null, // แปลงวันที่สร้างเป็น DateTime
+      mvendor: json['mvendor'] != null
+               ? MVendor.fromJson(json['mvendor'])
+               : null,
     );
+    
 
   }
 }

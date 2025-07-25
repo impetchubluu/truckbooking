@@ -28,8 +28,28 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthProvider()),
-        ChangeNotifierProvider(create: (context) => UserProfileProvider()), // <-- เพิ่ม Provider ใหม่
+        ChangeNotifierProxyProvider<AuthProvider, UserProfileProvider>(
+          // `create` จะถูกเรียกแค่ครั้งแรกเพื่อสร้าง instance
+          create: (context) => UserProfileProvider(),
+
+          // `update` จะถูกเรียกทุกครั้งที่ AuthProvider มีการ notifyListeners()
+          update: (context, auth, previousUserProfile) {
+            // `auth` คือ instance ของ AuthProvider
+            // `previousUserProfile` คือ instance ของ UserProfileProvider ที่มีอยู่
+            
+            // --- Logic การล้างข้อมูล ---
+            // ถ้า token ใน AuthProvider เป็น null (หมายถึง user เพิ่ง logout)
+            if (auth.token == null) {
+              // ให้เราสั่ง clear ข้อมูลใน UserProfileProvider
+              previousUserProfile?.clear(); // <--- เรียกเมธอด clear ที่เราจะสร้าง
+            }
+
+            // คืนค่า instance เดิมของ UserProfileProvider กลับไป
+            return previousUserProfile!;
+          },
+        ),
       ],
+
       child: const MyApp(),
     ),
   );

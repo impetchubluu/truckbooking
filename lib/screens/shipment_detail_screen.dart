@@ -170,7 +170,7 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
           children: [
             Text('Shipment ${shipment.shipid}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('Date : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
+            Text('วันที่นัดรถ : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
              if(shipment.shippoint == '1001')
                   const Text('คลัง: WH7'),
             if(shipment.shippoint == '1000')
@@ -249,7 +249,7 @@ Widget _buildDetailsTable(Shipment shipment) {
     border: TableBorder.all(color: Colors.grey.shade300, width: 1),
     columnWidths: const {
       0: FlexColumnWidth(1.8), // DO ID
-      1: FlexColumnWidth(3),   // Customer Name
+      1: FlexColumnWidth(2.5),   // Customer Name
       2: FlexColumnWidth(1.8), // Date
       3: FlexColumnWidth(1.3), // Volume
     },
@@ -258,9 +258,9 @@ Widget _buildDetailsTable(Shipment shipment) {
       TableRow(
         decoration: BoxDecoration(color: Colors.grey.shade200),
         children: [
-          buildHeaderCell('DO ID'),
+          buildHeaderCell('DO'),
           buildHeaderCell('Customer'),
-          buildHeaderCell('Routedes'),
+          buildHeaderCell('Route'),
           buildHeaderCell('Volume'),
         ],
       ),
