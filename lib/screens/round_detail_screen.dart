@@ -1,10 +1,8 @@
-// lib/screens/round_detail_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/api_models.dart';
 import '../services/api_service.dart';
-import 'shipment_detail_screen.dart'; // ตรวจสอบว่ามีการ import ShipmentDetailScreen จริง
+import 'shipment_detail_screen.dart';
 
 class RoundDetailScreen extends StatefulWidget {
   final int roundId;
@@ -34,13 +32,15 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
   bool _isLoading = true;
   String? _errorMessage;
   bool _isAllocating = false;
+  bool _autoAllocated = false;
 
   // สำหรับ Tab Bar
   late TabController _tabController;
   final List<String> _tabs = ['Pending', 'Accepted', 'Canceled', 'Unresponsive'];
   
-  // สำหรับ Countdown Timer
+  // สำหรับ Timer ต่างๆ
   Timer? _allocationTimer;
+  Timer? _roundTimeCheckTimer;
   Duration? _remainingTime;
   static const int responseTimeoutMinutes = 30;
 
@@ -49,89 +49,141 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _fetchRoundDetailsAndAutoAssign();
+    _startRoundTimeChecker();
   }
   
   @override
   void dispose() {
     _tabController.dispose();
     _allocationTimer?.cancel();
+    _roundTimeCheckTimer?.cancel();
     super.dispose();
   }
 
+  // เริ่มตรวจสอบเวลาเพื่อทำ Auto-Allocate
+  void _startRoundTimeChecker() {
+    if (widget.roundTime == null) return;
+
+    final now = DateTime.now();
+    final roundDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      widget.roundTime!.hour,
+      widget.roundTime!.minute,
+    );
+
+    // ถ้าถึงเวลารอบแล้วให้ทำ allocate ทันที
+    if (now.isAfter(roundDateTime)) {
+      _handleAllocate(isAuto: true);
+      return;
+    }
+
+    // ตั้ง Timer ตรวจสอบทุกนาที
+    _roundTimeCheckTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      final currentTime = DateTime.now();
+      if (currentTime.isAfter(roundDateTime)) {
+        _handleAllocate(isAuto: true);
+        timer.cancel();
+      }
+    });
+  }
+
   Future<void> _fetchRoundDetailsAndAutoAssign() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() { 
+      _isLoading = true; 
+      _errorMessage = null; 
+    });
+    
     try {
-      // 1. ดึงข้อมูลรอบปัจจุบันก่อน
       var round = await _apiService.getBookingRoundDetails(widget.accessToken, widget.roundId);
       
-      // 2. ตรวจสอบว่าในรอบมี Shipments หรือยัง
       if (mounted && (round.shipments.isEmpty)) {
-        // 2.1 ถ้ายังไม่มี ให้ทำการ Assign อัตโนมัติ
         print("Round is empty. Auto-assigning all ready shipments...");
-       String WarehouseCode = widget.warehouseCode; // เอาค่าที่รับมาเป็นค่าเริ่มต้น
+        String warehouseCode = widget.warehouseCode;
 
-  if (widget.warehouseCode == 'SW') {
-  WarehouseCode = '1000';
-    print("Corrected warehouse code from 'SW' to '1000'");
-  } else if (widget.warehouseCode == 'WH7') { // เพิ่มเงื่อนไขสำหรับคลังอื่นเผื่อไว้
-    WarehouseCode = '1001';
-    print("Corrected warehouse code from 'WH7' to '1001'");
-  }
-        // เราจะไม่ await ที่นี่ แต่จะใช้ .then() เพื่อให้ UI แสดง Loading ต่อไป
+        if (widget.warehouseCode == 'SW') {
+          warehouseCode = '1000';
+          print("Corrected warehouse code from 'SW' to '1000'");
+        } else if (widget.warehouseCode == 'WH7') {
+          warehouseCode = '1001';
+          print("Corrected warehouse code from 'WH7' to '1001'");
+        }
+
         _apiService.assignAllToRound(
           widget.accessToken,
           widget.roundId,
           widget.selectedDate,
-          WarehouseCode,
+          warehouseCode,
         ).then((_) {
-          // หลังจาก Assign สำเร็จ ให้ดึงข้อมูลรอบอีกครั้งเพื่อแสดงผล
           if(mounted) _fetchRoundDetailsOnly();
         }).catchError((e) {
-           if (mounted) {
-             setState(() {
-                _errorMessage = "Auto-assign failed: $e";
-                _isLoading = false;
-             });
-           }
+          if (mounted) {
+            setState(() {
+              _errorMessage = "Auto-assign failed: $e";
+              _isLoading = false;
+            });
+          }
         });
       } else {
-        // 2.2 ถ้ารอบมี Shipments อยู่แล้ว ก็แค่แสดงผล
         if (mounted) {
           setState(() {
             _roundDetails = round;
             _checkAndStartTimer();
-            _isLoading = false; // หยุด Loading ที่นี่
+            _isLoading = false;
           });
         }
       }
     } catch (e) {
-      if (mounted) setState(() { _errorMessage = e.toString(); _isLoading = false; });
+      if (mounted) setState(() { 
+        _errorMessage = e.toString(); 
+        _isLoading = false; 
+      });
     }
   }
 
-  // ฟังก์ชันใหม่สำหรับดึงข้อมูลอย่างเดียว (ไม่ Auto-assign)
   Future<void> _fetchRoundDetailsOnly() async {
-    // ไม่ต้อง setState loading ที่นี่ เพราะ UI loading อยู่แล้ว
     try {
-       final round = await _apiService.getBookingRoundDetails(widget.accessToken, widget.roundId);
-       if(mounted){
-         setState(() {
-           _roundDetails = round;
-           _checkAndStartTimer();
-         });
-       }
+      final round = await _apiService.getBookingRoundDetails(widget.accessToken, widget.roundId);
+      if(mounted){
+        setState(() {
+          _roundDetails = round;
+          _checkAndStartTimer();
+        });
+      }
     } catch (e) {
-       if (mounted) setState(() => _errorMessage = e.toString());
+      if (mounted) setState(() => _errorMessage = e.toString());
     } finally {
-       if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
   
   void _checkAndStartTimer() {
     _allocationTimer?.cancel();
 
-    if (_roundDetails == null || _roundDetails!.shipments.isEmpty) return;
-
+    if (_roundDetails == null || _roundDetails!.shipments.isEmpty) {
+      // ถ้ายังไม่มี shipments และถึงเวลารอบแล้ว ให้ทำ allocate
+      final now = DateTime.now();
+      if (widget.roundTime != null) {
+        final roundDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          widget.roundTime!.hour,
+          widget.roundTime!.minute,
+        );
+        if (now.isAfter(roundDateTime)) {
+          _handleAllocate(isAuto: true);
+        }
+      }
+      return;
+    }
+    
     final pendingShipments = _roundDetails!.shipments
         .where((s) => (s.docstat == '02' || s.docstat == 'BC') && s.assigned_at != null)
         .toList();
@@ -154,7 +206,10 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
   
   void _startTimer(DateTime endTime) {
     _allocationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) { 
+        timer.cancel(); 
+        return; 
+      }
       
       final now = DateTime.now();
       if (now.toUtc().isAfter(endTime.toUtc())) {
@@ -167,20 +222,35 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
     });
   }
 
-  Future<void> _handleAllocate() async {
-    setState(() => _isAllocating = true);
+  Future<void> _handleAllocate({bool isAuto = false}) async {
+    if (_isAllocating) return;
+    
+    setState(() {
+      _isAllocating = true;
+      if (isAuto) _autoAllocated = true;
+    });
+    
     try {
       await _apiService.allocateRound(widget.accessToken, widget.roundId);
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('เริ่มกระบวนการจัดสรรงานสำเร็จ!'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(isAuto 
+              ? 'ระบบเริ่มจัดสรรงานอัตโนมัติตามเวลาที่กำหนด'
+              : 'เริ่มกระบวนการจัดสรรงานสำเร็จ!'),
+            backgroundColor: Colors.green,
+          ),
         );
         await _fetchRoundDetailsOnly();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'), 
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -199,7 +269,6 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
       case 'Canceled':
         return _roundDetails!.shipments.where((s) => ['06', 'RJ'].contains(s.docstat)).toList();
       case 'Unresponsive':
-        // TODO: เพิ่ม Logic สำหรับ Unresponsive
         return [];
       default:
         return _roundDetails!.shipments;
@@ -223,6 +292,11 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
   Widget _buildContent() {
     final bool hasShipments = _roundDetails?.shipments.isNotEmpty ?? false;
     final bool isAllocated = _remainingTime != null;
+    final now = DateTime.now();
+    final roundDateTime = widget.roundTime != null 
+      ? DateTime(now.year, now.month, now.day, widget.roundTime!.hour, widget.roundTime!.minute)
+      : null;
+    final isRoundTimePassed = roundDateTime != null && now.isAfter(roundDateTime);
 
     return Padding(
       padding: const EdgeInsets.all(12.0),
@@ -238,16 +312,35 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    '${widget.roundName} : ${widget.roundTime?.format(context) ?? ""}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${widget.roundName} : ${widget.roundTime?.format(context) ?? ""}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      if (roundDateTime != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _autoAllocated
+                            ? 'จัดสรรงานอัตโนมัติแล้ว'
+                            : isRoundTimePassed
+                                ? 'พร้อมจัดสรรงานอัตโนมัติ'
+                                : 'จะจัดสรรงานอัตโนมัติในเวลา ${widget.roundTime!.format(context)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _autoAllocated ? Colors.green : Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               if (hasShipments)
                 ElevatedButton.icon(
-                  onPressed: isAllocated || _isAllocating ? null : _handleAllocate,
+                  onPressed: isAllocated || _isAllocating ? null : () => _handleAllocate(),
                   icon: _isAllocating
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.send_outlined),
@@ -271,8 +364,8 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
             TabBar(
               controller: _tabController,
               isScrollable: true,
-              tabAlignment: TabAlignment.start, // ทำให้ Tab ชิดซ้าย
-    labelPadding: const EdgeInsets.symmetric(horizontal: 20.0), 
+              tabAlignment: TabAlignment.start,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 20.0), 
               tabs: _tabs.map((tabName) {
                 final count = _getFilteredShipments(tabName).length;
                 return Tab(
@@ -331,7 +424,7 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
             subtitle: Text('สถานะ: ${shipment.docstat} - ${shipment.carlicense ?? 'N/A'}'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-               Navigator.of(context).push(
+              Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => ShipmentDetailScreen(
                     shipId: shipment.shipid,
