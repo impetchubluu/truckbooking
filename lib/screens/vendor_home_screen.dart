@@ -134,7 +134,7 @@ Future<Map<String, String>?> _showAcceptJobDialog(BuildContext context,State scr
             ),
           ),
           if (!isAvailable)
-            Icon(Icons.warning_amber_rounded, color: const Color.fromARGB(255, 245, 78, 0), size: 18),
+            const Icon(Icons.warning_amber_rounded, color: Color.fromARGB(255, 245, 78, 0), size: 18),
         ],
       ),
     );

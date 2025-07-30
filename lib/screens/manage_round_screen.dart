@@ -146,9 +146,9 @@ class _ManageRoundsScreenState extends State<ManageRoundsScreen> {
              child: InkWell(
                onTap: () => _selectTime(index),
                child: InputDecorator(
-                 decoration: InputDecoration(
-                     border: const OutlineInputBorder(),
-                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                 decoration: const InputDecoration(
+                     border: OutlineInputBorder(),
+                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                      suffixIcon: Icon(Icons.arrow_drop_down),
                  ),
                  child: Text(

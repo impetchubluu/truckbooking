@@ -140,10 +140,12 @@ class _RoundDetailScreenState extends State<RoundDetailScreen> with SingleTicker
         }
       }
     } catch (e) {
-      if (mounted) setState(() { 
+      if (mounted) {
+        setState(() { 
         _errorMessage = e.toString(); 
         _isLoading = false; 
       });
+      }
     }
   }
 
